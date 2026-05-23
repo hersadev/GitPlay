@@ -6,32 +6,59 @@ import Terminal from './components/terminal/Terminal';
 import LessonPanel from './components/lesson/LessonPanel';
 import LessonSelector from './components/lesson/LessonSelector';
 import StatusPanel from './components/status/StatusPanel';
+import FileViewer from './components/files/FileViewer';
+import BadgesPanel from './components/badges/BadgesPanel';
+import BadgeToast from './components/badges/BadgeToast';
+import GitHubView from './components/github/GitHubView';
+import { useGitStore } from './store/gitStore';
 import { useGitEngine } from './hooks/useGitEngine';
 import { useTerminalHistory } from './hooks/useTerminalHistory';
 import { useLessonProgress } from './hooks/useLessonProgress';
+import { useBadges } from './hooks/useBadges';
+import { BADGES } from './utils/badges';
 import { saveLessonIndex, loadLessonIndex, clearProgress } from './utils/persistence';
 import { module1 } from './lessons/module1';
 import { module2 } from './lessons/module2';
 import { module3 } from './lessons/module3';
 import { module4 } from './lessons/module4';
 import { module5 } from './lessons/module5';
+import { moduleGithub } from './lessons/moduleGithub';
 
-const ALL_LESSONS = [...module1, ...module2, ...module3, ...module4, ...module5];
+// Orden pedagógico: ramas → GitHub → reescribir historia → equipo avanzado → escenarios reales.
+const ALL_LESSONS = [
+  ...module1,
+  ...module2,
+  ...moduleGithub,
+  ...module3,
+  ...module4,
+  ...module5,
+];
 
 export default function App() {
-  const { repoState, runCommand, resetRepo } = useGitEngine();
+  const { repoState, runCommand, resetRepo, seedFiles, editFile, runSetup } = useGitEngine();
   const { lines, pushCommand, pushOutput } = useTerminalHistory();
 
   const [lessonIndex, setLessonIndex] = useState(() => loadLessonIndex());
   const [showSuccess, setShowSuccess] = useState(false);
   const [sandboxMode, setSandboxMode] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [badgesOpen, setBadgesOpen] = useState(false);
+  const [githubOpen, setGithubOpen] = useState(false);
+  const [openFile, setOpenFile] = useState(null); // { name, source: 'staged' | 'working' | 'commit', hash? }
+
+  const { openPR, mergePR, closePR } = useGitStore();
 
   // Track the previous isComplete value to detect false → true transitions only
   const prevIsComplete = useRef(false);
 
   const currentLesson = sandboxMode ? null : (ALL_LESSONS[lessonIndex] ?? null);
   const { completedCount, isComplete, checkObjective } = useLessonProgress(currentLesson);
+
+  const { earned, recent, reset: resetBadges, dismissRecent } = useBadges({
+    repoState,
+    lessonIndex,
+    totalLessons: ALL_LESSONS.length,
+  });
 
   // Persist lesson index whenever it changes
   useEffect(() => {
@@ -42,6 +69,13 @@ export default function App() {
   useEffect(() => {
     checkObjective(repoState);
   }, [repoState, checkObjective]);
+
+  // Plantar archivos y/o ejecutar setup arbitrario de la lección.
+  useEffect(() => {
+    if (!currentLesson) return;
+    if (currentLesson.setupFiles) seedFiles(currentLesson.setupFiles);
+    if (typeof currentLesson.setup === 'function') runSetup(currentLesson.setup);
+  }, [currentLesson?.id, seedFiles, runSetup]);
 
   // Advance only when isComplete transitions false → true (not on initial load)
   useEffect(() => {
@@ -69,10 +103,14 @@ export default function App() {
   function handleReset() {
     clearProgress();
     resetRepo();
+    resetBadges();
     setLessonIndex(0);
     prevIsComplete.current = false;
     setSandboxMode(false);
     setSelectorOpen(false);
+    setBadgesOpen(false);
+    // Forzar re-seed: si lessonIndex ya era 0, el useEffect no se redispararía.
+    if (ALL_LESSONS[0]?.setupFiles) seedFiles(ALL_LESSONS[0].setupFiles);
   }
 
   function handleSelectLesson(index) {
@@ -92,7 +130,14 @@ export default function App() {
       onReset={handleReset}
       onOpenLessons={() => setSelectorOpen(true)}
       onToggleSandbox={handleToggleSandbox}
+      onOpenBadges={() => setBadgesOpen(true)}
+      onOpenGithub={() => setGithubOpen(true)}
+      openPRsCount={(repoState.pullRequests ?? []).filter((p) => p.state === 'open').length}
       sandboxMode={sandboxMode}
+      lessonIndex={lessonIndex}
+      totalLessons={ALL_LESSONS.length}
+      earnedCount={earned.size}
+      totalBadges={BADGES.length}
     >
       {sandboxMode ? (
         <aside className="w-80 flex flex-col gap-3 p-4 bg-gray-900 border-r border-gray-700">
@@ -123,7 +168,9 @@ export default function App() {
           commits={repoState.commits}
           branches={repoState.branches}
           tags={repoState.tags}
+          remoteRefs={repoState.remoteRefs}
           HEAD={repoState.HEAD}
+          onOpenFile={(f) => setOpenFile(f)}
         />
 
         <AnimatePresence>
@@ -141,10 +188,24 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <Terminal history={lines} onCommand={handleCommand} />
+        <Terminal history={lines} onCommand={handleCommand} repoState={repoState} />
       </div>
 
-      <StatusPanel repo={repoState} />
+      <StatusPanel
+        repo={repoState}
+        onOpenFile={(name, source) => setOpenFile({ name, source })}
+      />
+
+      <AnimatePresence>
+        {openFile && (
+          <FileViewer
+            file={openFile}
+            repo={repoState}
+            onClose={() => setOpenFile(null)}
+            onSave={(name, content) => editFile(name, content)}
+          />
+        )}
+      </AnimatePresence>
 
       {selectorOpen && (
         <LessonSelector
@@ -153,6 +214,29 @@ export default function App() {
           onClose={() => setSelectorOpen(false)}
         />
       )}
+
+      <AnimatePresence>
+        {badgesOpen && (
+          <BadgesPanel earned={earned} onClose={() => setBadgesOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {githubOpen && (
+          <GitHubView
+            repo={repoState}
+            onClose={() => setGithubOpen(false)}
+            onOpenPR={openPR}
+            onMergePR={mergePR}
+            onClosePR={closePR}
+            onOpenFile={(f) => setOpenFile(f)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {recent && <BadgeToast badge={recent} onClose={dismissRecent} />}
+      </AnimatePresence>
     </MainLayout>
   );
 }

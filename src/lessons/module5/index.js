@@ -11,6 +11,12 @@ import {
   fileNotOnBranch,
   hasFileAnywhere,
 } from '../_helpers';
+import {
+  EXPERIMENTAL_JS,
+  CSRF_FIX_JS,
+  PAYMENTS_JSX,
+  API_REFACTORED_JS,
+} from './fixtures';
 
 export const module5 = [
   {
@@ -39,6 +45,7 @@ export const module5 = [
       'git reset --hard HEAD~1  (rebobina main al commit anterior)',
       'Verifica: git log main (no debe aparecer) y git log experimento (sí)',
     ],
+    setupFiles: { 'experimental.js': EXPERIMENTAL_JS },
     curiosity:
       'Si todavía no has hecho push, este truco es indistinguible de no haberte equivocado nunca. La regla informal: cuanto antes te das cuenta del error, menos invasiva es la solución.',
   },
@@ -65,6 +72,7 @@ export const module5 = [
       'Anota el hash con: git log',
       'git switch release/1.0 && git cherry-pick <hash>',
     ],
+    setupFiles: { 'csrf-fix.js': CSRF_FIX_JS },
     curiosity:
       'En proyectos grandes (Linux, Chromium, Postgres…) los hotfixes se aplican primero en la rama principal y luego se "back-portan" a las versiones de soporte con cherry-pick. Es exactamente este flujo, repetido a escala industrial.',
   },
@@ -117,6 +125,7 @@ export const module5 = [
       'git switch feature/payments && git rebase main',
       'git switch main && git merge feature/payments  (ahora será fast-forward)',
     ],
+    setupFiles: { 'Payments.jsx': PAYMENTS_JSX, 'api.js': API_REFACTORED_JS },
     curiosity:
       'Hay dos escuelas: "merge para que se vea cuándo se integró cada feature" o "rebase para que el historial sea lineal y limpio". No hay una respuesta universal: lo importante es que el equipo elija una y la respete.',
   },

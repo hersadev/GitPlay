@@ -8,6 +8,7 @@ import {
   fileOnBranch,
   hasMergeInBranch,
 } from '../_helpers';
+import { LOGIN_JSX, DARK_MODE_JS, CHANGELOG_MD } from './fixtures';
 
 export const module2 = [
   {
@@ -54,6 +55,7 @@ export const module2 = [
       'git commit -m "feat: formulario de login"',
       'Comprueba: git log (verás el commit solo en esta rama)',
     ],
+    setupFiles: { 'Login.jsx': LOGIN_JSX },
     curiosity:
       'HEAD es un puntero al "commit actual". Normalmente apunta a una rama (que a su vez apunta a un commit), pero también puede apuntar directamente a un commit: eso es el famoso "HEAD desacoplado".',
   },
@@ -82,6 +84,7 @@ export const module2 = [
       'git add darkMode.js',
       'git commit -m "feat: alternador de modo oscuro"',
     ],
+    setupFiles: { 'darkMode.js': DARK_MODE_JS },
     curiosity:
       'La barra "/" en `feature/dark-mode` no crea carpetas reales en disco: Git solo la usa como convención para agrupar ramas. Muchas herramientas (GitHub, GitKraken…) la aprovechan para mostrar las ramas en un árbol.',
   },
@@ -147,6 +150,7 @@ export const module2 = [
       'git merge feature/dark-mode   (ahora es 3-way, crea un merge commit)',
       'git branch -d feature/dark-mode   (limpia la rama ya integrada)',
     ],
+    setupFiles: { 'CHANGELOG.md': CHANGELOG_MD },
     curiosity:
       'Un merge 3-way busca el "antepasado común" de las dos ramas y combina los cambios respecto a él. `-d` solo borra ramas ya integradas; `-D` (mayúscula) borra a las bravas, así que úsala con cuidado.',
   },

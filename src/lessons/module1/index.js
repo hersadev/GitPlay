@@ -8,6 +8,14 @@ import {
   fileOnBranch,
   commitMsgMatches,
 } from '../_helpers';
+import {
+  README_MD,
+  PACKAGE_JSON,
+  INDEX_HTML,
+  APP_JS,
+  STYLES_CSS,
+  VALIDATION_JS,
+} from './fixtures';
 
 export const module1 = [
   {
@@ -30,7 +38,7 @@ export const module1 = [
     objectives: [
       {
         label: 'Añadir README.md al staging area',
-        validate: (s) => s.stagingArea.includes('README.md') || hasFileAnywhere('README.md')(s),
+        validate: (s) => s.stagingArea.has('README.md') || hasFileAnywhere('README.md')(s),
       },
       {
         label: 'Crear el primer commit con README.md',
@@ -42,6 +50,7 @@ export const module1 = [
       'git commit -m "docs: añadir README inicial"',
       'Convención: los mensajes de docs empiezan con "docs:"',
     ],
+    setupFiles: { 'README.md': README_MD },
     curiosity:
       'El primer commit del propio Git fue de Linus Torvalds y su mensaje fue "Initial revision of \'git\', the information manager from hell". Le puso ese nombre medio en broma porque, en inglés británico, "git" significa "tipo desagradable".',
   },
@@ -53,7 +62,7 @@ export const module1 = [
     objectives: [
       {
         label: 'Añadir package.json al staging',
-        validate: (s) => s.stagingArea.includes('package.json') || hasFileAnywhere('package.json')(s),
+        validate: (s) => s.stagingArea.has('package.json') || hasFileAnywhere('package.json')(s),
       },
       {
         label: 'Commitear package.json',
@@ -69,6 +78,7 @@ export const module1 = [
       'git commit -m "chore: añadir package.json"',
       'git status (debe decir "árbol de trabajo limpio")',
     ],
+    setupFiles: { 'package.json': PACKAGE_JSON },
     curiosity:
       'Git tiene tres "zonas": el working directory (lo que ves en disco), el staging area (también llamado "index") y el repositorio. `git status` es básicamente una foto de las diferencias entre las tres.',
   },
@@ -96,6 +106,11 @@ export const module1 = [
       'git add index.html app.js styles.css   (o:  git add .)',
       'git commit -m "feat: estructura inicial de la app"',
     ],
+    setupFiles: {
+      'index.html': INDEX_HTML,
+      'app.js': APP_JS,
+      'styles.css': STYLES_CSS,
+    },
     curiosity:
       'Cada commit en Git se identifica con un hash SHA-1 de 40 caracteres. Normalmente solo usamos los 7 primeros porque, aun acortándolos, las colisiones son prácticamente imposibles en un proyecto real.',
   },
@@ -127,6 +142,7 @@ export const module1 = [
       'git add validation.js',
       'git commit -m "fix: validar email vacío en el formulario"',
     ],
+    setupFiles: { 'validation.js': VALIDATION_JS },
     curiosity:
       'La convención "Conventional Commits" nació para que un script pueda generar el CHANGELOG y decidir la versión automáticamente: `feat:` sube la minor, `fix:` la patch y un "BREAKING CHANGE:" en el cuerpo sube la major.',
   },

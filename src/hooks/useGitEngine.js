@@ -3,7 +3,7 @@ import { useGitStore } from '../store/gitStore';
 import { parseCommand } from '../engine/CommandParser';
 
 export function useGitEngine() {
-  const { repoState, applyCommand, resetRepo } = useGitStore();
+  const { repoState, applyCommand, resetRepo, seedFiles, editFile, runSetup } = useGitStore();
 
   const runCommand = useCallback(
     (input) => {
@@ -14,5 +14,5 @@ export function useGitEngine() {
     [applyCommand]
   );
 
-  return { repoState, runCommand, resetRepo };
+  return { repoState, runCommand, resetRepo, seedFiles, editFile, runSetup };
 }

@@ -12,6 +12,13 @@ import {
   fileNotOnBranch,
   commitMsgMatches,
 } from '../_helpers';
+import {
+  TASKS_JS,
+  NODE_MODULES,
+  EXPERIMENTO_JS,
+  API_JS,
+  AUTH_FIX_JS,
+} from './fixtures';
 
 export const module3 = [
   {
@@ -35,6 +42,7 @@ export const module3 = [
       'git reset --soft HEAD~1',
       'Comprueba: el commit desaparece pero los archivos siguen en staging',
     ],
+    setupFiles: { 'tasks.js': TASKS_JS },
     curiosity:
       'Cuando rehaces el último commit, también puedes usar `git commit --amend` para corregir mensaje o añadir archivos sin crear uno nuevo. Ojo: amend cambia el hash, así que evítalo si ya hiciste push a una rama compartida.',
   },
@@ -46,7 +54,7 @@ export const module3 = [
     objectives: [
       {
         label: 'Tener node_modules en el staging (simula el error)',
-        validate: (s) => s.stagingArea.includes('node_modules') || lastArg('reset', '--mixed')(s),
+        validate: (s) => s.stagingArea.has('node_modules') || lastArg('reset', '--mixed')(s),
       },
       {
         label: 'Limpiar el staging con git reset --mixed',
@@ -58,6 +66,7 @@ export const module3 = [
       'git reset --mixed    (o simplemente: git reset, --mixed es el defecto)',
       'Recuerda añadir node_modules al .gitignore en proyectos reales',
     ],
+    setupFiles: { 'node_modules': NODE_MODULES },
     curiosity:
       'El .gitignore solo ignora archivos que aún no están trackeados. Si ya commiteaste algo por error (como node_modules), tienes que sacarlo del index con `git rm --cached <archivo>` además de añadirlo al .gitignore.',
   },
@@ -83,6 +92,7 @@ export const module3 = [
       'git reset --hard HEAD~1',
       '⚠️ El commit queda fuera del historial activo',
     ],
+    setupFiles: { 'experimento.js': EXPERIMENTO_JS },
     curiosity:
       'Aunque hagas `reset --hard`, Git no borra el commit de inmediato: queda como "huérfano" y el recolector de basura (`git gc`) lo eliminará pasados unos 30-90 días. Por eso el reflog puede salvarte la vida si lo notas a tiempo.',
   },
@@ -117,7 +127,7 @@ export const module3 = [
     objectives: [
       {
         label: 'Tener api.js en el staging (o ya guardado)',
-        validate: (s) => s.stagingArea.includes('api.js') || s.stash.length > 0,
+        validate: (s) => s.stagingArea.has('api.js') || s.stash.length > 0,
       },
       {
         label: 'Guardar el trabajo con git stash',
@@ -125,6 +135,7 @@ export const module3 = [
       },
     ],
     hints: ['git add api.js', 'git stash', 'Tu staging queda vacío, pero el trabajo está a salvo'],
+    setupFiles: { 'api.js': API_JS },
     curiosity:
       'El stash es una pila (LIFO): el último que guardas es el primero que sacas. Puedes ponerle nombre con `git stash push -m "mensaje"` y ver la pila con `git stash list` para no perderte entre varios.',
   },
@@ -188,6 +199,7 @@ export const module3 = [
       'git switch main',
       'git cherry-pick <hash>',
     ],
+    setupFiles: { 'auth-fix.js': AUTH_FIX_JS },
     curiosity:
       'Cherry-pick acepta rangos (`git cherry-pick A..B`) y también varios commits a la vez. Si hay conflictos, lo pausa para que los resuelvas y luego continúas con `git cherry-pick --continue`.',
   },

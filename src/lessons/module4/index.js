@@ -9,6 +9,7 @@ import {
   fileOnBranch,
   isDetached,
 } from '../_helpers';
+import { DASHBOARD_JSX, METRICS_JS, NOTIFICATIONS_JS } from './fixtures';
 
 export const module4 = [
   {
@@ -102,6 +103,7 @@ export const module4 = [
       'Simula avance de main: git switch main && git add metrics.js && git commit -m "feat: métricas"',
       'git switch feature/dashboard && git rebase main',
     ],
+    setupFiles: { 'Dashboard.jsx': DASHBOARD_JSX, 'metrics.js': METRICS_JS },
     curiosity:
       'Rebase no "mueve" commits: los reescribe uno a uno encima de la otra rama, generando hashes nuevos. Por eso nunca debes rebasear commits que ya estén en remoto compartido (les cambia la identidad a los demás).',
   },
@@ -127,6 +129,7 @@ export const module4 = [
       'git add notifications.js && git commit -m "feat: notificaciones in-app"',
       'git switch develop && git merge feature/notifications',
     ],
+    setupFiles: { 'notifications.js': NOTIFICATIONS_JS },
     curiosity:
       'GitFlow fue formalizado por Vincent Driessen en 2010 y se hizo enormemente popular. Hoy muchos equipos prefieren alternativas más simples como "Trunk-based development" o "GitHub Flow", sobre todo en proyectos con despliegue continuo.',
   },

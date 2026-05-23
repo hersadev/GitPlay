@@ -22,7 +22,7 @@ function edgePath(x1, y1, x2, y2) {
   return `M ${x1} ${y1} C ${cx1} ${y1} ${cx2} ${y2} ${x2} ${y2}`;
 }
 
-function CommitDetail({ commit, branches, tags, HEAD, onClose }) {
+function CommitDetail({ commit, branches, tags, HEAD, onClose, onOpenFile }) {
   const branchesHere = [...branches.entries()].filter(([, h]) => h === commit.hash).map(([n]) => n);
   const tagsHere = [...tags.entries()].filter(([, h]) => h === commit.hash).map(([n]) => n);
   const date = new Date(commit.timestamp).toLocaleString('es-ES', {
@@ -93,8 +93,14 @@ function CommitDetail({ commit, branches, tags, HEAD, onClose }) {
             </p>
             <ul className="space-y-0.5 max-h-24 overflow-y-auto">
               {commit.files.map((f) => (
-                <li key={f} className="flex items-center gap-1 text-xs font-mono text-green-300">
-                  <span className="text-green-500">+</span>{f}
+                <li key={f} className="flex items-center gap-1 text-xs font-mono">
+                  <span className="text-green-500">+</span>
+                  <button
+                    onClick={() => onOpenFile?.({ name: f, source: 'commit', hash: commit.hash })}
+                    className="text-green-300 hover:text-green-200 hover:underline text-left truncate"
+                  >
+                    {f}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -121,7 +127,7 @@ function BranchLegend({ branchColor, HEAD }) {
   );
 }
 
-export default function GraphView({ commits, branches, tags = new Map(), HEAD }) {
+export default function GraphView({ commits, branches, tags = new Map(), remoteRefs = new Map(), HEAD, onOpenFile }) {
   const [selectedHash, setSelectedHash] = useState(null);
 
   const positions = useMemo(() => computeLayout(commits, branches), [commits, branches]);
@@ -162,12 +168,17 @@ export default function GraphView({ commits, branches, tags = new Map(), HEAD })
   const currentCommitHash = branches.get(HEAD) ?? (commits.has(HEAD) ? HEAD : null);
   const selectedCommit = selectedHash ? commits.get(selectedHash) : null;
 
-  // Group branches by commit for stacked labels
+  // Group branches by commit for stacked labels (incluyendo refs remotas).
   const byHash = new Map();
   for (const [name, hash] of branches.entries()) {
     if (!hash) continue;
     if (!byHash.has(hash)) byHash.set(hash, []);
-    byHash.get(hash).push(name);
+    byHash.get(hash).push({ name, kind: 'local' });
+  }
+  for (const [name, hash] of remoteRefs.entries()) {
+    if (!hash || !commits.has(hash)) continue;
+    if (!byHash.has(hash)) byHash.set(hash, []);
+    byHash.get(hash).push({ name, kind: 'remote' });
   }
 
   return (
@@ -267,49 +278,59 @@ export default function GraphView({ commits, branches, tags = new Map(), HEAD })
           })}
         </AnimatePresence>
 
-        {/* Branch labels */}
+        {/* Branch labels (locales y remotas) */}
         <AnimatePresence>
-          {[...branches.entries()].map(([name, hash]) => {
-            if (!hash) return null;
-            const pos = positions.get(hash);
-            if (!pos) return null;
-            const color = branchColor.get(name) ?? '#6b7280';
-            const isActive = name === HEAD;
-            const textWidth = name.length * 7 + 16;
-            const stackIndex = byHash.get(hash)?.indexOf(name) ?? 0;
-            const LABEL_H = 22;
-            const labelY = pos.y - NODE_R - 22 - stackIndex * LABEL_H;
+          {(() => {
+            const items = [];
+            for (const [hash, refs] of byHash.entries()) {
+              const pos = positions.get(hash);
+              if (!pos) continue;
+              refs.forEach((ref, stackIndex) => {
+                items.push({ ...ref, hash, pos, stackIndex });
+              });
+            }
+            return items.map(({ name, kind, pos, stackIndex }) => {
+              const localName = kind === 'remote' ? name.replace(/^origin\//, '') : name;
+              const color = branchColor.get(localName) ?? '#6b7280';
+              const isActive = kind === 'local' && name === HEAD;
+              const textWidth = name.length * 7 + 16;
+              const LABEL_H = 22;
+              const labelY = pos.y - NODE_R - 22 - stackIndex * LABEL_H;
+              const remote = kind === 'remote';
 
-            return (
-              <motion.g
-                key={`branch-${name}`}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <rect
-                  x={pos.x - textWidth / 2}
-                  y={labelY - 9}
-                  width={textWidth}
-                  height={18}
-                  rx={4}
-                  fill={isActive ? color : `${color}40`}
-                  stroke={color}
-                  strokeWidth={1}
-                />
-                <text
-                  x={pos.x} y={labelY}
-                  textAnchor="middle" dominantBaseline="middle"
-                  fontSize={10} fontFamily="monospace"
-                  fontWeight={isActive ? 'bold' : 'normal'}
-                  fill={isActive ? '#000' : color}
+              return (
+                <motion.g
+                  key={`label-${name}`}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  {name}
-                </text>
-              </motion.g>
-            );
-          })}
+                  <rect
+                    x={pos.x - textWidth / 2}
+                    y={labelY - 9}
+                    width={textWidth}
+                    height={18}
+                    rx={4}
+                    fill={isActive ? color : remote ? '#1f293720' : `${color}40`}
+                    stroke={color}
+                    strokeWidth={1}
+                    strokeDasharray={remote ? '3 2' : undefined}
+                  />
+                  <text
+                    x={pos.x} y={labelY}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fontSize={10} fontFamily="monospace"
+                    fontWeight={isActive ? 'bold' : 'normal'}
+                    fill={isActive ? '#000' : color}
+                    opacity={remote ? 0.85 : 1}
+                  >
+                    {name}
+                  </text>
+                </motion.g>
+              );
+            });
+          })()}
         </AnimatePresence>
 
         {/* HEAD label when detached */}
@@ -339,6 +360,7 @@ export default function GraphView({ commits, branches, tags = new Map(), HEAD })
             tags={tags}
             HEAD={HEAD}
             onClose={() => setSelectedHash(null)}
+            onOpenFile={onOpenFile}
           />
         )}
       </AnimatePresence>

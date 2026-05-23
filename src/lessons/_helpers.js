@@ -1,6 +1,5 @@
 // Validadores reutilizables para las lecciones.
-// Diseñados para evaluar el ESTADO del repo (no contadores arbitrarios),
-// así una lección no depende de cuántos commits acumulados haya hecho el usuario.
+// Evalúan ESTADO (no contadores), así una lección no depende de cuántos commits previos haya.
 
 export const initialized = (s) => s.initialized === true;
 
@@ -15,24 +14,32 @@ export const lastCmd = (cmd) => (s) => s.lastCommand?.command === cmd;
 export const lastArg = (cmd, arg) => (s) =>
   s.lastCommand?.command === cmd && s.lastCommand?.args?.includes(arg);
 
-// ¿Existe en el grafo algún commit (ancestro o huérfano) con este archivo?
+// Busca el archivo en el árbol (snapshot) de cualquier commit del grafo.
+// Compat: si un commit antiguo no tiene `tree`, cae a `files`.
 export const hasFileAnywhere = (file) => (s) =>
-  [...s.commits.values()].some((c) => c.files.includes(file));
+  [...s.commits.values()].some((c) =>
+    (c.tree && c.tree.has?.(file)) || c.files?.includes?.(file)
+  );
 
-// ¿Existe en la historia activa de esa rama un commit con este archivo?
+// El archivo está en el árbol del tip de esta rama (= existe en esa rama hoy).
 export const fileOnBranch = (file, branch) => (s) => {
   if (!s.branches.has(branch)) return false;
-  let cur = s.branches.get(branch);
+  const tipHash = s.branches.get(branch);
+  if (!tipHash) return false;
+  const tipCommit = s.commits.get(tipHash);
+  if (tipCommit?.tree?.has?.(file)) return true;
+  // Fallback compat: caminar historia.
+  let cur = tipHash;
   while (cur) {
     const c = s.commits.get(cur);
     if (!c) return false;
-    if (c.files.includes(file)) return true;
+    if (c.files?.includes?.(file)) return true;
     cur = c.parent;
   }
   return false;
 };
 
-// La rama existe pero el archivo NO está en su historia activa (útil tras un reset --hard).
+// La rama existe pero el archivo NO está en su árbol (útil tras reset --hard o revert).
 export const fileNotOnBranch = (file, branch) => (s) =>
   s.branches.has(branch) && !fileOnBranch(file, branch)(s);
 
@@ -40,7 +47,7 @@ export const fileNotOnBranch = (file, branch) => (s) =>
 export const commitMsgMatches = (regex) => (s) =>
   [...s.commits.values()].some((c) => regex.test(c.message));
 
-// ¿Algún commit en la historia activa de esta rama es un merge (tiene secondParent)?
+// ¿Algún commit en la historia activa de esta rama es un merge?
 export const hasMergeInBranch = (branch) => (s) => {
   if (!s.branches.has(branch)) return false;
   let cur = s.branches.get(branch);
@@ -56,3 +63,35 @@ export const hasMergeInBranch = (branch) => (s) => {
 // HEAD desacoplado: apunta a un hash de commit en lugar de a una rama.
 export const isDetached = (s) =>
   !s.branches.has(s.HEAD) && s.commits.has(s.HEAD);
+
+// ── Validadores para GitHub / remoto ──────────────────────────────────
+
+// La rama existe en el remoto (alguien la pusheó).
+export const branchOnRemote = (name) => (s) =>
+  !!s.remoteBranches?.has?.(name);
+
+// La rama local y la remota apuntan al mismo commit.
+export const branchSynced = (name) => (s) =>
+  s.branches?.get?.(name) && s.remoteBranches?.get?.(name) === s.branches?.get?.(name);
+
+// El cliente conoce la ref origin/<branch> (= ha hecho fetch al menos una vez).
+export const hasRemoteRef = (branch) => (s) =>
+  !!s.remoteRefs?.has?.(`origin/${branch}`);
+
+// Hay un PR abierto con esta combinación.
+export const hasOpenPR = (from, into) => (s) =>
+  (s.pullRequests ?? []).some(
+    (p) => p.state === 'open' && p.from === from && (!into || p.into === into)
+  );
+
+// Hay un PR mergeado con esta combinación.
+export const hasMergedPR = (from, into) => (s) =>
+  (s.pullRequests ?? []).some(
+    (p) => p.state === 'merged' && p.from === from && (!into || p.into === into)
+  );
+
+// Hay al menos un PR (en cualquier estado).
+export const hasAnyPR = (s) => (s.pullRequests ?? []).length > 0;
+
+// El estado del repo NO tiene mergeState activo (= conflictos resueltos).
+export const mergeResolved = (s) => !s.mergeState;

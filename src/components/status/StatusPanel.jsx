@@ -13,15 +13,16 @@ function Empty({ text }) {
   return <p className="text-xs text-gray-600 italic">{text}</p>;
 }
 
-export default function StatusPanel({ repo }) {
+export default function StatusPanel({ repo, onOpenFile }) {
   const {
     initialized,
     commits = new Map(),
     branches = new Map(),
     tags = new Map(),
     HEAD,
-    stagingArea = [],
+    stagingArea = new Map(),
     workingDirectory = new Map(),
+    mergeState = null,
     stash = [],
   } = repo ?? {};
 
@@ -38,8 +39,40 @@ export default function StatusPanel({ repo }) {
     cur = c.parent;
   }
 
+  const conflicts = mergeState?.conflicts ? [...mergeState.conflicts] : [];
+
   return (
     <aside className="w-60 flex flex-col gap-4 p-4 bg-gray-900 border-l border-gray-700 overflow-y-auto text-sm">
+
+      {/* Merge banner */}
+      {mergeState && (
+        <div className="rounded-md border border-orange-700 bg-orange-900/30 px-3 py-2">
+          <p className="text-xs uppercase tracking-wider text-orange-300 font-semibold">
+            ⚠ Merge en curso
+          </p>
+          <p className="text-xs text-orange-100 mt-1">
+            Mergeando <span className="font-mono">{mergeState.fromBranch}</span>
+          </p>
+          {conflicts.length > 0 && (
+            <ul className="mt-2 space-y-0.5">
+              {conflicts.map((f) => (
+                <li key={f} className="flex items-center gap-1.5 text-xs font-mono">
+                  <span className="text-red-400 flex-shrink-0">✗</span>
+                  <button
+                    onClick={() => onOpenFile?.(f, 'working')}
+                    className="text-red-200 truncate hover:text-red-100 hover:underline text-left"
+                  >
+                    {f}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-[10px] text-orange-300/80 mt-2 leading-snug">
+            Edita los archivos, quita los marcadores <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code>, haz <code>git add</code> y commitea. O <code>git merge --abort</code>.
+          </p>
+        </div>
+      )}
 
       {/* Repo state */}
       <Section title="Repositorio">
@@ -64,14 +97,19 @@ export default function StatusPanel({ repo }) {
 
       {/* Staging area */}
       <Section title="Staging">
-        {stagingArea.length === 0 ? (
+        {stagingArea.size === 0 ? (
           <Empty text="Vacío" />
         ) : (
           <ul className="space-y-0.5">
-            {stagingArea.map((f) => (
+            {[...stagingArea.keys()].map((f) => (
               <li key={f} className="flex items-center gap-1.5 text-xs font-mono">
                 <span className="text-green-400 font-bold flex-shrink-0">+</span>
-                <span className="text-green-300 truncate">{f}</span>
+                <button
+                  onClick={() => onOpenFile?.(f, 'staged')}
+                  className="text-green-300 truncate hover:text-green-200 hover:underline text-left"
+                >
+                  {f}
+                </button>
               </li>
             ))}
           </ul>
@@ -82,10 +120,15 @@ export default function StatusPanel({ repo }) {
       {workingDirectory.size > 0 && (
         <Section title="Sin preparar">
           <ul className="space-y-0.5">
-            {[...workingDirectory.entries()].map(([f, state]) => (
+            {[...workingDirectory.keys()].map((f) => (
               <li key={f} className="flex items-center gap-1.5 text-xs font-mono">
                 <span className="text-yellow-400 font-bold flex-shrink-0">~</span>
-                <span className="text-yellow-300 truncate">{f}</span>
+                <button
+                  onClick={() => onOpenFile?.(f, 'working')}
+                  className="text-yellow-300 truncate hover:text-yellow-200 hover:underline text-left"
+                >
+                  {f}
+                </button>
               </li>
             ))}
           </ul>

@@ -3,13 +3,15 @@ import { module2 } from '../../lessons/module2';
 import { module3 } from '../../lessons/module3';
 import { module4 } from '../../lessons/module4';
 import { module5 } from '../../lessons/module5';
+import { moduleGithub } from '../../lessons/moduleGithub';
 
 const MODULES = [
   { name: 'Módulo 1 — Arrancar TaskFlow', lessons: module1 },
   { name: 'Módulo 2 — Features en ramas', lessons: module2 },
-  { name: 'Módulo 3 — Reescribir historia y releases', lessons: module3 },
-  { name: 'Módulo 4 — Trabajo en equipo', lessons: module4 },
-  { name: 'Módulo 5 — Escenarios reales', lessons: module5 },
+  { name: 'Módulo 3 — Trabajar con GitHub', lessons: moduleGithub },
+  { name: 'Módulo 4 — Reescribir historia y releases', lessons: module3 },
+  { name: 'Módulo 5 — Trabajo en equipo avanzado', lessons: module4 },
+  { name: 'Módulo 6 — Escenarios reales', lessons: module5 },
 ];
 
 export default function LessonSelector({ currentIndex, onSelect, onClose }) {
