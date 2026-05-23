@@ -119,7 +119,7 @@ export const module1 = [
     objectives: [
       {
         label: 'Crear un commit con prefijo "fix:"',
-        validate: commitMsgMatches(/^fix:\s/),
+        validate: commitMsgMatches(/^fix:/),
       },
     ],
     hints: [

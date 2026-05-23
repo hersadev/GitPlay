@@ -109,6 +109,7 @@ export default function App() {
         </aside>
       ) : (
         <LessonPanel
+          key={currentLesson?.id}
           lesson={currentLesson}
           lessonIndex={lessonIndex}
           total={ALL_LESSONS.length}
@@ -121,6 +122,7 @@ export default function App() {
         <GraphView
           commits={repoState.commits}
           branches={repoState.branches}
+          tags={repoState.tags}
           HEAD={repoState.HEAD}
         />
 
