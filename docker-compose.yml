@@ -1,0 +1,5 @@
+services:
+  gitplay:
+    build: .
+    ports:
+      - "8080:80"
