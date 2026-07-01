@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { computeLayout, svgDimensions } from '../../utils/graphLayout';
 
 const BRANCH_PALETTE = [
-  '#4ade80', // green  — main
-  '#60a5fa', // blue
-  '#f472b6', // pink
-  '#fb923c', // orange
-  '#a78bfa', // purple
-  '#34d399', // emerald
+  '#b8bb26', // verde oliva — main
+  '#83a598', // azul
+  '#d3869b', // púrpura
+  '#fe8019', // naranja
+  '#8ec07c', // aqua
+  '#fabd2f', // amarillo
 ];
 
 const NODE_R = 18;
@@ -152,7 +152,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
         hash = commits.get(hash)?.parent ?? null;
       }
     }
-    commits.forEach((_, h) => { if (!map.has(h)) map.set(h, '#6b7280'); });
+    commits.forEach((_, h) => { if (!map.has(h)) map.set(h, '#928374'); });
     return map;
   }, [commits, branches, branchColor]);
 
@@ -244,7 +244,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
       >
         <defs>
           <marker id="arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-            <path d="M0,0 L7,3.5 L0,7 Z" fill="#4b5563" />
+            <path d="M0,0 L7,3.5 L0,7 Z" fill="#665c54" />
           </marker>
         </defs>
 
@@ -262,7 +262,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                 <path
                   key={`${parentHash}-${commit.hash}`}
                   d={edgePath(parentPos.x, parentPos.y, pos.x, pos.y)}
-                  stroke="#374151"
+                  stroke="#504945"
                   strokeWidth={2}
                   fill="none"
                   markerEnd="url(#arrowhead)"
@@ -280,7 +280,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
             const isHead = commit.hash === currentCommitHash;
             const isSelected = commit.hash === selectedHash;
             const isNewest = commit.hash === newestHash;
-            const color = nodeColor.get(commit.hash) ?? '#6b7280';
+            const color = nodeColor.get(commit.hash) ?? '#928374';
             const label = commit.message.length > 18
               ? commit.message.slice(0, 17) + '…'
               : commit.message;
@@ -311,7 +311,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                 )}
                 {/* HEAD ring */}
                 {isHead && (
-                  <circle cx={pos.x} cy={pos.y} r={NODE_R + 4} fill="none" stroke="#fbbf24" strokeWidth={2} strokeDasharray="4 2" />
+                  <circle cx={pos.x} cy={pos.y} r={NODE_R + 4} fill="none" stroke="#fabd2f" strokeWidth={2} strokeDasharray="4 2" />
                 )}
                 {/* Node circle */}
                 <circle
@@ -334,7 +334,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                 <text
                   x={pos.x} y={pos.y + NODE_R + 14}
                   textAnchor="middle"
-                  fontSize={9} fill={isSelected ? '#d1d5db' : '#6b7280'}
+                  fontSize={9} fill={isSelected ? '#bdae93' : '#928374'}
                 >
                   {label}
                 </text>
@@ -356,7 +356,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
             }
             return items.map(({ name, kind, pos, stackIndex }) => {
               const localName = kind === 'remote' ? name.replace(/^origin\//, '') : name;
-              const color = branchColor.get(localName) ?? '#6b7280';
+              const color = branchColor.get(localName) ?? '#928374';
               const isActive = kind === 'local' && name === HEAD;
               const textWidth = name.length * 7 + 16;
               const LABEL_H = 22;
@@ -377,7 +377,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                     width={textWidth}
                     height={18}
                     rx={4}
-                    fill={isActive ? color : remote ? '#1f293720' : `${color}40`}
+                    fill={isActive ? color : remote ? '#3c383620' : `${color}40`}
                     stroke={color}
                     strokeWidth={1}
                     strokeDasharray={remote ? '3 2' : undefined}
@@ -387,7 +387,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                     textAnchor="middle" dominantBaseline="middle"
                     fontSize={10} fontFamily="monospace"
                     fontWeight={isActive ? 'bold' : 'normal'}
-                    fill={isActive ? '#000' : color}
+                    fill={isActive ? '#1d2021' : color}
                     opacity={remote ? 0.85 : 1}
                   >
                     {name}
@@ -404,8 +404,8 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
           if (!pos) return null;
           return (
             <g>
-              <rect x={pos.x - 22} y={pos.y - NODE_R - 40} width={44} height={18} rx={4} fill="#fbbf24" />
-              <text x={pos.x} y={pos.y - NODE_R - 31} textAnchor="middle" dominantBaseline="middle" fontSize={10} fontFamily="monospace" fontWeight="bold" fill="#000">
+              <rect x={pos.x - 22} y={pos.y - NODE_R - 40} width={44} height={18} rx={4} fill="#fabd2f" />
+              <text x={pos.x} y={pos.y - NODE_R - 31} textAnchor="middle" dominantBaseline="middle" fontSize={10} fontFamily="monospace" fontWeight="bold" fill="#1d2021">
                 HEAD
               </text>
             </g>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MainLayout from './components/layout/MainLayout';
+import ResizeHandle from './components/layout/ResizeHandle';
 import GraphView from './components/graph/GraphView';
 import Terminal from './components/terminal/Terminal';
 import LessonPanel from './components/lesson/LessonPanel';
@@ -24,6 +25,8 @@ import { module4 } from './lessons/module4';
 import { module5 } from './lessons/module5';
 import { moduleGithub } from './lessons/moduleGithub';
 
+const clampWidth = (px, min, max) => Math.max(min, Math.min(max, px));
+
 // Orden pedagógico: ramas → GitHub → reescribir historia → equipo avanzado → escenarios reales.
 const ALL_LESSONS = [
   ...module1,
@@ -45,6 +48,9 @@ export default function App() {
   const [badgesOpen, setBadgesOpen] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [openFile, setOpenFile] = useState(null); // { name, source: 'staged' | 'working' | 'commit', hash? }
+  const [leftWidth, setLeftWidth] = useState(320);
+  const [rightWidth, setRightWidth] = useState(240);
+  const [terminalHeight, setTerminalHeight] = useState(192);
 
   const { openPR, mergePR, closePR } = useGitStore();
 
@@ -139,6 +145,7 @@ export default function App() {
       earnedCount={earned.size}
       totalBadges={BADGES.length}
     >
+      <div style={{ width: leftWidth }} className="flex flex-shrink-0 [&>aside]:w-full">
       {sandboxMode ? (
         <aside className="w-80 flex flex-col gap-3 p-4 bg-gray-900 border-r border-gray-700">
           <span className="text-xs text-yellow-400 uppercase tracking-wider">Modo Sandbox</span>
@@ -162,6 +169,9 @@ export default function App() {
           isComplete={isComplete}
         />
       )}
+      </div>
+
+      <ResizeHandle onResize={(dx) => setLeftWidth((w) => clampWidth(w + dx, 240, 560))} />
 
       <div className="flex flex-col flex-1 overflow-hidden relative">
         <GraphView
@@ -188,13 +198,24 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <Terminal history={lines} onCommand={handleCommand} repoState={repoState} />
+        <ResizeHandle
+          orientation="horizontal"
+          onResize={(dy) => setTerminalHeight((h) => clampWidth(h - dy, 96, 560))}
+        />
+
+        <div style={{ height: terminalHeight }} className="flex-shrink-0 [&>div]:h-full">
+          <Terminal history={lines} onCommand={handleCommand} repoState={repoState} />
+        </div>
       </div>
 
-      <StatusPanel
-        repo={repoState}
-        onOpenFile={(name, source) => setOpenFile({ name, source })}
-      />
+      <ResizeHandle onResize={(dx) => setRightWidth((w) => clampWidth(w - dx, 200, 520))} />
+
+      <div style={{ width: rightWidth }} className="flex flex-shrink-0 [&>aside]:w-full">
+        <StatusPanel
+          repo={repoState}
+          onOpenFile={(name, source) => setOpenFile({ name, source })}
+        />
+      </div>
 
       <AnimatePresence>
         {openFile && (
