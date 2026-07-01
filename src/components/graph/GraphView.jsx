@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { computeLayout, svgDimensions } from '../../utils/graphLayout';
 
@@ -156,6 +156,60 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
     return map;
   }, [commits, branches, branchColor]);
 
+  // Commit donde apunta HEAD (rama actual o HEAD desacoplado).
+  const currentCommitHash = branches.get(HEAD) ?? (commits.has(HEAD) ? HEAD : null);
+
+  // Commit más reciente por timestamp (empate → hash mayor, igual que el layout).
+  const newestHash = useMemo(() => {
+    let newest = null;
+    let best = -Infinity;
+    for (const c of commits.values()) {
+      if (c.timestamp > best || (c.timestamp === best && newest && c.hash.localeCompare(newest) > 0)) {
+        best = c.timestamp;
+        newest = c.hash;
+      }
+    }
+    return newest;
+  }, [commits]);
+
+  // Cámara: seguir el commit de HEAD (o el más nuevo) cuando el usuario avanza.
+  const containerRef = useRef(null);
+  const [zoom, setZoom] = useState(1);
+  const focusHash = currentCommitHash ?? newestHash;
+  const prevFocus = useRef(null);
+
+  useEffect(() => {
+    if (!focusHash || prevFocus.current === focusHash) return;
+    prevFocus.current = focusHash;
+    const el = containerRef.current;
+    const pos = positions.get(focusHash);
+    if (!el || !pos) return;
+
+    // Solo movemos la cámara si el commit de HEAD queda fuera de la vista
+    // (con un margen), para no robarle el scroll manual al usuario.
+    const x = pos.x * zoom;
+    const y = pos.y * zoom;
+    const margin = NODE_R * 2;
+    const inViewX = x >= el.scrollLeft + margin && x <= el.scrollLeft + el.clientWidth - margin;
+    const inViewY = y >= el.scrollTop + margin && y <= el.scrollTop + el.clientHeight - margin;
+    if (inViewX && inViewY) return;
+
+    el.scrollTo({
+      left: Math.max(0, x - el.clientWidth / 2),
+      top: Math.max(0, y - el.clientHeight / 2),
+      behavior: 'smooth',
+    });
+  }, [focusHash, positions, zoom]);
+
+  function zoomBy(factor) {
+    setZoom((z) => Math.min(2, Math.max(0.3, +(z * factor).toFixed(2))));
+  }
+  function fitToView() {
+    const el = containerRef.current;
+    if (!el) return;
+    setZoom(Math.min(1, Math.min(el.clientWidth / width, el.clientHeight / height)));
+  }
+
   if (!commits.size) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-gray-950 gap-2">
@@ -165,7 +219,6 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
     );
   }
 
-  const currentCommitHash = branches.get(HEAD) ?? (commits.has(HEAD) ? HEAD : null);
   const selectedCommit = selectedHash ? commits.get(selectedHash) : null;
 
   // Group branches by commit for stacked labels (incluyendo refs remotas).
@@ -182,10 +235,10 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
   }
 
   return (
-    <div className="flex-1 bg-gray-950 overflow-auto relative">
+    <div ref={containerRef} className="flex-1 bg-gray-950 overflow-auto relative">
       <svg
-        width={Math.max(width, 400)}
-        height={Math.max(height, 200)}
+        width={Math.max(width * zoom, 400)}
+        height={Math.max(height * zoom, 200)}
         className="block"
         onClick={() => setSelectedHash(null)}
       >
@@ -195,6 +248,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
           </marker>
         </defs>
 
+        <g transform={`scale(${zoom})`}>
         {/* Edges */}
         {[...commits.values()].flatMap((commit) => {
           const pos = positions.get(commit.hash);
@@ -225,6 +279,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
             if (!pos) return null;
             const isHead = commit.hash === currentCommitHash;
             const isSelected = commit.hash === selectedHash;
+            const isNewest = commit.hash === newestHash;
             const color = nodeColor.get(commit.hash) ?? '#6b7280';
             const label = commit.message.length > 18
               ? commit.message.slice(0, 17) + '…'
@@ -240,6 +295,16 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                 style={{ transformOrigin: `${pos.x}px ${pos.y}px`, cursor: 'pointer' }}
                 onClick={(e) => { e.stopPropagation(); setSelectedHash(commit.hash === selectedHash ? null : commit.hash); }}
               >
+                {/* Ping en el commit más reciente: onda tipo radar */}
+                {isNewest && !selectedHash && (
+                  <motion.circle
+                    cx={pos.x} cy={pos.y}
+                    fill="none" stroke={color} strokeWidth={2.5}
+                    initial={{ r: NODE_R, opacity: 0.55 }}
+                    animate={{ r: NODE_R + 22, opacity: 0 }}
+                    transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }}
+                  />
+                )}
                 {/* Selection ring */}
                 {isSelected && (
                   <circle cx={pos.x} cy={pos.y} r={NODE_R + 7} fill="none" stroke="white" strokeWidth={1.5} strokeOpacity={0.4} />
@@ -346,10 +411,37 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
             </g>
           );
         })()}
+        </g>
       </svg>
 
       {/* Branch color legend */}
       <BranchLegend branchColor={branchColor} HEAD={HEAD} />
+
+      {/* Controles de zoom */}
+      <div className="absolute bottom-4 left-4 flex items-center gap-1 bg-gray-900/80 border border-gray-700 rounded-md p-1 backdrop-blur-sm">
+        <button
+          onClick={() => zoomBy(0.8)}
+          className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded text-lg leading-none"
+          aria-label="Alejar"
+        >
+          −
+        </button>
+        <button
+          onClick={fitToView}
+          className="px-2 h-7 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded text-[11px] font-mono min-w-[42px]"
+          aria-label="Ajustar a la vista"
+          title="Ajustar a la vista"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button
+          onClick={() => zoomBy(1.25)}
+          className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded text-lg leading-none"
+          aria-label="Acercar"
+        >
+          +
+        </button>
+      </div>
 
       {/* Commit detail panel */}
       <AnimatePresence>
