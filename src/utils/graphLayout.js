@@ -1,7 +1,15 @@
-const H_SPACING = 130;
+const H_SPACING_MAX = 130;
+const H_SPACING_MIN = 80;
 const V_SPACING = 80;
 const OFFSET_X = 80;
 const OFFSET_Y = 80;
+
+// El grafo se ensancha a medida que avanza el curso: comprimimos el espaciado
+// horizontal según el nº de commits para que no crezca sin control.
+function horizontalSpacing(count) {
+  if (count <= 6) return H_SPACING_MAX;
+  return Math.max(H_SPACING_MIN, H_SPACING_MAX - (count - 6) * 5);
+}
 
 export function computeLayout(commits, branches) {
   if (!commits.size) return new Map();
@@ -11,6 +19,7 @@ export function computeLayout(commits, branches) {
     a.timestamp !== b.timestamp ? a.timestamp - b.timestamp : a.hash.localeCompare(b.hash)
   );
   const xIndex = new Map(sorted.map((c, i) => [c.hash, i]));
+  const H_SPACING = horizontalSpacing(sorted.length);
 
   // Assign rows: walk each branch tip → root, main branch first
   const rows = new Map();

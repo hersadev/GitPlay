@@ -121,3 +121,41 @@ export function clearProgress() {
     localStorage.removeItem(LEGACY_LESSON_KEY);
   } catch (_) {}
 }
+
+const BADGES_KEY = 'gitplay:badges';
+const EXPORT_VERSION = 1;
+
+// Empaqueta todo el progreso (repo, lección y logros) tal cual está en
+// localStorage para descargarlo como archivo. El progreso ya se auto-guarda;
+// esto permite además hacer copia de seguridad y llevarlo a otro navegador.
+export function exportProgress() {
+  try {
+    return {
+      _app: 'gitplay',
+      _export: EXPORT_VERSION,
+      savedAt: new Date().toISOString(),
+      repo: localStorage.getItem(REPO_KEY),
+      lesson: localStorage.getItem(LESSON_KEY),
+      badges: localStorage.getItem(BADGES_KEY),
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+// Restaura un progreso exportado. Devuelve true si el archivo es válido.
+// El llamador debe recargar la app para que el store se reinicialice.
+export function importProgress(data) {
+  try {
+    if (!data || data._app !== 'gitplay') return false;
+    if (typeof data.repo === 'string') localStorage.setItem(REPO_KEY, data.repo);
+    else localStorage.removeItem(REPO_KEY);
+    if (typeof data.lesson === 'string') localStorage.setItem(LESSON_KEY, data.lesson);
+    else localStorage.removeItem(LESSON_KEY);
+    if (typeof data.badges === 'string') localStorage.setItem(BADGES_KEY, data.badges);
+    else localStorage.removeItem(BADGES_KEY);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}

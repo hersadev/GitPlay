@@ -1,5 +1,5 @@
-// Módulo 1 — Arrancar TaskFlow (6 lecciones)
-// Inicializas un proyecto desde cero: README, estructura base, primer log.
+// Módulo 1 — Arrancar TaskFlow (7 lecciones)
+// Inicializas un proyecto desde cero: README, estructura base, diff y primer log.
 
 import {
   initialized,
@@ -10,6 +10,7 @@ import {
 } from '../_helpers';
 import {
   README_MD,
+  README_MD_EDITED,
   PACKAGE_JSON,
   INDEX_HTML,
   APP_JS,
@@ -84,6 +85,25 @@ export const module1 = [
   },
   {
     id: 'm1-l4',
+    title: 'Ver los cambios con git diff',
+    description:
+      'Editaste el README (una línea nueva y marcaste "Login" como hecho) pero aún no lo has commiteado. Antes de preparar nada, `git diff` te muestra línea a línea qué cambió respecto al último commit: lo verde (+) se añade, lo rojo (−) se quita.',
+    objectives: [
+      { label: 'Inspeccionar los cambios sin preparar con git diff', validate: lastCmd('diff') },
+    ],
+    hints: [
+      'git diff',
+      'Verás una línea "+Es un proyecto de código abierto." y el cambio en el roadmap',
+      'Cuando ya hayas hecho "git add", usa "git diff --staged" para ver lo que va al commit',
+    ],
+    // editFile (no setupFiles) para modificar el README aunque ya esté commiteado:
+    // seedFiles omitiría un archivo ya presente en el árbol y el diff saldría vacío.
+    setup: (engine) => engine.editFile('README.md', README_MD_EDITED),
+    curiosity:
+      '`git diff` (a secas) compara el working directory con el staging; `git diff --staged` compara el staging con el último commit; y `git diff <commitA> <commitB>` compara dos puntos cualesquiera de la historia. Es la lupa con la que revisas exactamente qué vas a commitear.',
+  },
+  {
+    id: 'm1-l5',
     title: 'Varios archivos en un solo commit',
     description:
       'TaskFlow necesita una estructura mínima: `index.html`, `app.js` y `styles.css`. Mételos todos en un único commit con `git add .`.',
@@ -115,7 +135,7 @@ export const module1 = [
       'Cada commit en Git se identifica con un hash SHA-1 de 40 caracteres. Normalmente solo usamos los 7 primeros porque, aun acortándolos, las colisiones son prácticamente imposibles en un proyecto real.',
   },
   {
-    id: 'm1-l5',
+    id: 'm1-l6',
     title: 'Ver el historial con git log',
     description:
       'Ya tienes varios commits. `git log` muestra la línea de tiempo del proyecto: hash, autor, fecha y mensaje de cada uno.',
@@ -127,7 +147,7 @@ export const module1 = [
       '`git log` abre por defecto un "pager" (como `less`) para poder navegar historiales largos. Pulsa `q` para salir, `/` para buscar y `espacio` para avanzar de página.',
   },
   {
-    id: 'm1-l6',
+    id: 'm1-l7',
     title: 'Mensajes convencionales: corrige un bug',
     description:
       'La convención más usada (Conventional Commits) prefija el mensaje: `feat:` para nuevas features, `fix:` para bugs, `docs:`, `chore:`, `refactor:`. Crea un commit con un `fix:` simulando que arreglas algo en TaskFlow.',

@@ -27,6 +27,35 @@ npm run dev
 - [ ] Sincronización con backend
 `;
 
+// Igual que README_MD pero con dos retoques sin commitear (una línea nueva y
+// una tarea del roadmap marcada como hecha). Sirve para que `git diff` muestre
+// un cambio real en la lección de diff.
+export const README_MD_EDITED = `# TaskFlow
+
+Aplicación web para gestionar tus tareas diarias.
+Permite crear listas, marcar tareas como hechas y filtrar por estado.
+Es un proyecto de código abierto.
+
+## Tecnología
+
+- HTML + CSS vanilla
+- JavaScript modular (ES2020)
+- Sin frameworks (de momento)
+
+## Cómo arrancar
+
+\`\`\`bash
+npm install
+npm run dev
+\`\`\`
+
+## Roadmap
+
+- [x] Login con email
+- [ ] Modo oscuro
+- [ ] Sincronización con backend
+`;
+
 export const PACKAGE_JSON = `{
   "name": "taskflow",
   "version": "0.0.1",
