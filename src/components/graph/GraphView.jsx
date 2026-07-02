@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { computeLayout, svgDimensions } from '../../utils/graphLayout';
+import { computeLayout, svgDimensions, layoutRefLabels } from '../../utils/graphLayout';
 
 const BRANCH_PALETTE = [
   '#b8bb26', // verde oliva — main
@@ -12,6 +12,12 @@ const BRANCH_PALETTE = [
 ];
 
 const NODE_R = 18;
+const TAG_COLOR = '#d3869b';
+
+// Colores posibles de arista (paleta + gris huérfano) para generar una
+// punta de flecha del mismo color que cada arista.
+const EDGE_COLORS = [...BRANCH_PALETTE, '#928374'];
+const arrowId = (color) => `arrow-${Math.max(0, EDGE_COLORS.indexOf(color))}`;
 
 function edgePath(x1, y1, x2, y2) {
   if (y1 === y2) {
@@ -58,6 +64,11 @@ function CommitDetail({ commit, branches, tags, HEAD, onClose, onOpenFile }) {
           <span className="text-gray-300">{commit.author}</span>
           <span className="mx-1">·</span>
           {date}
+          {commit.secondParent && (
+            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-300 border border-purple-800 align-middle">
+              merge
+            </span>
+          )}
         </p>
 
         {/* Branches */}
@@ -284,7 +295,16 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
 
   if (!commits.size) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-gray-950 gap-2">
+      <div className="flex-1 flex flex-col items-center justify-center bg-gray-950 gap-3">
+        {/* Mini-grafo de ejemplo: lo que está por venir */}
+        <svg width="200" height="56" className="opacity-70" aria-hidden="true">
+          <line x1="44" y1="28" x2="82" y2="28" stroke="#3f3f46" strokeWidth="2" />
+          <line x1="118" y1="28" x2="154" y2="28" stroke="#3f3f46" strokeWidth="2" strokeDasharray="4 3" />
+          <circle cx="28" cy="28" r="15" fill="#1f2937" stroke="#4b5563" strokeWidth="1.5" />
+          <circle cx="100" cy="28" r="15" fill="#1f2937" stroke="#4b5563" strokeWidth="1.5" />
+          <circle cx="172" cy="28" r="15" fill="none" stroke="#4b5563" strokeWidth="1.5" strokeDasharray="4 3" />
+          <text x="172" y="29" textAnchor="middle" dominantBaseline="middle" fontSize="12" fill="#6b7280" fontFamily="monospace">?</text>
+        </svg>
         <p className="text-gray-500 text-sm">El grafo aparecerá con tu primer commit</p>
         <p className="text-gray-700 text-xs font-mono">git init → git add archivo → git commit -m "..."</p>
       </div>
@@ -293,7 +313,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
 
   const selectedCommit = selectedHash ? commits.get(selectedHash) : null;
 
-  // Group branches by commit for stacked labels (incluyendo refs remotas).
+  // Group branches by commit for stacked labels (incluyendo refs remotas y tags).
   const byHash = new Map();
   for (const [name, hash] of branches.entries()) {
     if (!hash) continue;
@@ -304,6 +324,11 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
     if (!hash || !commits.has(hash)) continue;
     if (!byHash.has(hash)) byHash.set(hash, []);
     byHash.get(hash).push({ name, kind: 'remote' });
+  }
+  for (const [name, hash] of tags.entries()) {
+    if (!hash || !commits.has(hash)) continue;
+    if (!byHash.has(hash)) byHash.set(hash, []);
+    byHash.get(hash).push({ name, kind: 'tag' });
   }
 
   return (
@@ -321,33 +346,47 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
         onClick={() => setSelectedHash(null)}
       >
         <defs>
-          <marker id="arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-            <path d="M0,0 L7,3.5 L0,7 Z" fill="#665c54" />
-          </marker>
+          {/* Una punta de flecha por color de rama, para que cada arista
+              lleve la flecha a juego */}
+          {EDGE_COLORS.map((color) => (
+            <marker key={color} id={arrowId(color)} markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+              <path d="M0,0 L7,3.5 L0,7 Z" fill={color} fillOpacity={0.8} />
+            </marker>
+          ))}
+          {/* Rejilla de puntos: da sensación de lienzo y hace visible el paneo/zoom */}
+          <pattern id="dotgrid" width="26" height="26" patternUnits="userSpaceOnUse">
+            <circle cx="1.5" cy="1.5" r="1.2" fill="#1f2937" />
+          </pattern>
         </defs>
 
         <g transform={`translate(${cam.x} ${cam.y}) scale(${zoom})`}>
-        {/* Edges */}
+        {/* Fondo de rejilla, solidario con la cámara */}
+        <rect x={-4000} y={-4000} width={width + 8000} height={height + 8000} fill="url(#dotgrid)" />
+
+        {/* Edges: cada arista hereda el color de la rama del commit hijo;
+            la segunda arista de un merge lleva el color de la rama que entra */}
         {[...commits.values()].flatMap((commit) => {
           const pos = positions.get(commit.hash);
           if (!pos) return [];
-          return [commit.parent, commit.secondParent]
-            .filter(Boolean)
-            .map((parentHash) => {
-              const parentPos = positions.get(parentHash);
-              if (!parentPos) return null;
-              return (
-                <path
-                  key={`${parentHash}-${commit.hash}`}
-                  d={edgePath(parentPos.x, parentPos.y, pos.x, pos.y)}
-                  stroke="#504945"
-                  strokeWidth={2}
-                  fill="none"
-                  markerEnd="url(#arrowhead)"
-                />
-              );
-            })
-            .filter(Boolean);
+          const edges = [];
+          const pushEdge = (parentHash, color) => {
+            const parentPos = positions.get(parentHash);
+            if (!parentPos) return;
+            edges.push(
+              <path
+                key={`${parentHash}-${commit.hash}`}
+                d={edgePath(parentPos.x, parentPos.y, pos.x, pos.y)}
+                stroke={color}
+                strokeOpacity={0.55}
+                strokeWidth={2}
+                fill="none"
+                markerEnd={`url(#${arrowId(color)})`}
+              />
+            );
+          };
+          if (commit.parent) pushEdge(commit.parent, nodeColor.get(commit.hash) ?? '#928374');
+          if (commit.secondParent) pushEdge(commit.secondParent, nodeColor.get(commit.secondParent) ?? '#928374');
+          return edges;
         })}
 
         {/* Commit nodes */}
@@ -369,10 +408,13 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0, opacity: 0 }}
+                whileHover={{ scale: 1.08 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                 style={{ transformOrigin: `${pos.x}px ${pos.y}px`, cursor: 'pointer' }}
                 onClick={(e) => { e.stopPropagation(); setSelectedHash(commit.hash === selectedHash ? null : commit.hash); }}
               >
+                {/* Tooltip nativo con el mensaje completo */}
+                <title>{`${commit.hash} — ${commit.message}\n${commit.author}`}</title>
                 {/* Ping en el commit más reciente: onda tipo radar */}
                 {isNewest && !selectedHash && (
                   <motion.circle
@@ -408,9 +450,10 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                 >
                   {commit.hash.slice(0, 4)}
                 </text>
-                {/* Message below */}
+                {/* Message below — escalonado en dos alturas según la columna
+                    para que los títulos de commits vecinos no se solapen */}
                 <text
-                  x={pos.x} y={pos.y + NODE_R + 14}
+                  x={pos.x} y={pos.y + NODE_R + 14 + (pos.col % 2 ? 13 : 0)}
                   textAnchor="middle"
                   fontSize={9} fill={isSelected ? '#bdae93' : '#928374'}
                 >
@@ -428,34 +471,46 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
             for (const [hash, refs] of byHash.entries()) {
               const pos = positions.get(hash);
               if (!pos) continue;
-              refs.forEach((ref, stackIndex) => {
-                items.push({ ...ref, hash, pos, stackIndex });
+              refs.forEach((ref) => {
+                const text = ref.kind === 'tag' ? `◆ ${ref.name}` : ref.name;
+                items.push({ ...ref, hash, pos, text, textWidth: text.length * 7 + 16 });
               });
             }
-            return items.map(({ name, kind, pos, stackIndex }) => {
+            // Reparte las etiquetas en "pisos" para que las de commits
+            // vecinos no se solapen entre sí.
+            layoutRefLabels(items);
+            return items.map(({ name, kind, pos, text, textWidth, level, isStackBase }) => {
               const localName = kind === 'remote' ? name.replace(/^origin\//, '') : name;
-              const color = branchColor.get(localName) ?? '#928374';
+              const color = kind === 'tag' ? TAG_COLOR : branchColor.get(localName) ?? '#928374';
               const isActive = kind === 'local' && name === HEAD;
-              const textWidth = name.length * 7 + 16;
               const LABEL_H = 22;
-              const labelY = pos.y - NODE_R - 22 - stackIndex * LABEL_H;
+              const labelY = pos.y - NODE_R - 22 - level * LABEL_H;
               const remote = kind === 'remote';
 
               return (
                 <motion.g
-                  key={`label-${name}`}
+                  key={`label-${kind}-${name}`}
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.2 }}
                 >
+                  {/* Si la pila quedó elevada por colisiones, un conector
+                      punteado indica a qué commit pertenece */}
+                  {isStackBase && level > 0 && (
+                    <line
+                      x1={pos.x} y1={labelY + 9}
+                      x2={pos.x} y2={pos.y - NODE_R - 2}
+                      stroke={color} strokeWidth={1} strokeDasharray="2 3" opacity={0.55}
+                    />
+                  )}
                   <rect
                     x={pos.x - textWidth / 2}
                     y={labelY - 9}
                     width={textWidth}
                     height={18}
-                    rx={4}
-                    fill={isActive ? color : remote ? '#3c383620' : `${color}40`}
+                    rx={kind === 'tag' ? 9 : 4}
+                    fill={isActive ? color : remote ? '#3c383620' : kind === 'tag' ? `${color}26` : `${color}40`}
                     stroke={color}
                     strokeWidth={1}
                     strokeDasharray={remote ? '3 2' : undefined}
@@ -468,7 +523,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                     fill={isActive ? '#1d2021' : color}
                     opacity={remote ? 0.85 : 1}
                   >
-                    {name}
+                    {text}
                   </text>
                 </motion.g>
               );
