@@ -13,12 +13,14 @@ import BadgeModal from './components/badges/BadgeModal';
 import GitHubView from './components/github/GitHubView';
 import CommandLog from './components/commands/CommandLog';
 import WelcomeModal from './components/onboarding/WelcomeModal';
+import ModuleIntroModal from './components/lesson/ModuleIntroModal';
 import { useGitStore } from './store/gitStore';
 import { useGitEngine } from './hooks/useGitEngine';
 import { useTerminalHistory } from './hooks/useTerminalHistory';
 import { useLessonProgress } from './hooks/useLessonProgress';
 import { useBadges } from './hooks/useBadges';
 import { BADGES } from './utils/badges';
+import { extractModuleCommands } from './utils/commandInfo';
 import { splitChainedCommands } from './engine/CommandParser';
 import {
   saveLessonIndex,
@@ -29,7 +31,7 @@ import {
   loadWelcomeSeen,
   saveWelcomeSeen,
 } from './utils/persistence';
-import { ALL_LESSONS } from './lessons';
+import { ALL_LESSONS, MODULES, LESSON_MODULE_INDEX } from './lessons';
 
 const clampWidth = (px, min, max) => Math.max(min, Math.min(max, px));
 
@@ -59,6 +61,8 @@ export default function App() {
   const [openFile, setOpenFile] = useState(null); // { name, source: 'staged' | 'working' | 'commit', hash? }
   // Bienvenida: solo para usuarios nuevos (o tras reiniciar el juego).
   const [welcomeOpen, setWelcomeOpen] = useState(() => !loadWelcomeSeen());
+  // Aviso de comandos: se muestra cada vez que se entra en un módulo nuevo.
+  const [moduleIntroOpen, setModuleIntroOpen] = useState(false);
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(240);
   const [terminalHeight, setTerminalHeight] = useState(192);
@@ -77,6 +81,18 @@ export default function App() {
     totalLessons: ALL_LESSONS.length,
     isComplete,
   });
+
+  const currentModule = currentLesson ? MODULES[LESSON_MODULE_INDEX[lessonIndex]] ?? null : null;
+  const moduleCommands = currentModule ? extractModuleCommands(currentModule) : [];
+
+  // Al entrar en un módulo nuevo, avisar de los comandos que se van a usar.
+  // Espera a que no haya otro modal a pantalla completa abierto (bienvenida
+  // o logro) para no solaparse con ellos.
+  useEffect(() => {
+    if (!currentModule || welcomeOpen || recent) return;
+    if (moduleCommands.length === 0) return;
+    setModuleIntroOpen(true);
+  }, [currentModule?.id, welcomeOpen, recent, moduleCommands.length]);
 
   // Persist lesson index (y el máximo alcanzado, para el desbloqueo del selector)
   useEffect(() => {
@@ -171,6 +187,7 @@ export default function App() {
     setSelectorOpen(false);
     setBadgesOpen(false);
     setCommandsOpen(false);
+    setModuleIntroOpen(false);
     setWelcomeOpen(true); // empezar de cero: mostrar la bienvenida de nuevo
     // Forzar re-seed: si lessonIndex ya era 0, el useEffect no se redispararía.
     if (ALL_LESSONS[0]?.setupFiles) seedFiles(ALL_LESSONS[0].setupFiles);
@@ -351,6 +368,16 @@ export default function App() {
 
       <AnimatePresence>
         {welcomeOpen && <WelcomeModal onClose={handleCloseWelcome} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {moduleIntroOpen && (
+          <ModuleIntroModal
+            moduleDef={currentModule}
+            commands={moduleCommands}
+            onClose={() => setModuleIntroOpen(false)}
+          />
+        )}
       </AnimatePresence>
     </MainLayout>
   );
