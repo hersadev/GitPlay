@@ -1,4 +1,4 @@
-// Módulo 5 — Escenarios reales (5 lecciones)
+// Módulo 6 — Escenarios reales (5 lecciones)
 // Situaciones que aparecen en proyectos de verdad. Cada lección es un caso completo.
 
 import {

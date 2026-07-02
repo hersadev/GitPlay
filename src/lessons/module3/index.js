@@ -1,4 +1,4 @@
-// Módulo 3 — Reescribir historia y releases (8 lecciones)
+// Módulo 4 — Reescribir historia y releases (10 lecciones)
 // Cosas que salen mal y cómo arreglarlas: resets, revert, stash, tags, cherry-pick.
 
 import {

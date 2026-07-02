@@ -39,7 +39,7 @@ export const moduleGithub = [
     ],
     setupFiles: { 'README.md': README_BASE },
     curiosity:
-      'En proyectos abiertos, `git push` solo sube commits firmados por ti. GitHub muestra el "Verified" en verde al lado del commit cuando la clave GPG/SSH se valida en su lado.',
+      '`git push` sube todos tus commits, estén firmados o no. Si los firmas con GPG o SSH, GitHub muestra el "Verified" en verde al lado del commit cuando valida la firma en su lado — muchos proyectos abiertos lo exigen para aceptar contribuciones.',
   },
 
   {
