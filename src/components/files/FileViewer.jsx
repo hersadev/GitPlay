@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import ConflictResolver from './ConflictResolver';
+import { hasConflictMarkers } from '../../utils/conflicts';
 
 function resolveContent(file, repo) {
   if (!file) return { content: '', label: '', missing: true };
@@ -30,6 +32,23 @@ function resolveContent(file, repo) {
   return { content: '', label: '', missing: true };
 }
 
+// Etiquetas amigables para cada lado del conflicto según la operación en curso.
+// Ojo: en un rebase, "ours" (HEAD) es la nueva base (el trabajo que ya estaba)
+// y "theirs" es TU commit reaplicado — al revés de lo que uno espera.
+function conflictSides(repo) {
+  if (repo?.rebaseState) {
+    return {
+      ours: `lo que ya está en ${repo.rebaseState.target}`,
+      theirs: 'tu commit reaplicado',
+    };
+  }
+  const from = repo?.mergeState?.fromBranch;
+  return {
+    ours: `tu rama actual (${repo?.HEAD ?? 'HEAD'})`,
+    theirs: from ? `la rama que integras (${from})` : 'los cambios que llegan',
+  };
+}
+
 function langOf(filename) {
   if (filename.endsWith('.json')) return 'json';
   if (filename.endsWith('.md')) return 'md';
@@ -39,13 +58,17 @@ function langOf(filename) {
   return 'js';
 }
 
-export default function FileViewer({ file, repo, onClose, onSave }) {
+export default function FileViewer({ file, repo, onClose, onSave, onMarkResolved }) {
   const { content, label, missing } = resolveContent(file, repo);
   const lang = langOf(file.name);
   const canEdit = !!onSave; // si el padre nos da onSave, permitimos editar
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(content);
+
+  // Modo resolutor: el archivo del working dir trae marcadores de conflicto.
+  const conflicted =
+    !missing && !editing && canEdit && file.source === 'working' && hasConflictMarkers(content);
 
   // Si se abre otro archivo, resetear el draft
   useEffect(() => {
@@ -87,9 +110,12 @@ export default function FileViewer({ file, repo, onClose, onSave }) {
             {dirty && (
               <span className="text-[10px] uppercase text-yellow-400 flex-shrink-0">· modificado</span>
             )}
+            {conflicted && (
+              <span className="text-[10px] uppercase text-orange-400 flex-shrink-0">· en conflicto</span>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {canEdit && !editing && !missing && (
+            {canEdit && !editing && !missing && !conflicted && (
               <button
                 onClick={() => setEditing(true)}
                 className="text-xs text-blue-400 hover:text-blue-300 border border-blue-900 hover:border-blue-700 px-2 py-1 rounded"
@@ -128,11 +154,24 @@ export default function FileViewer({ file, repo, onClose, onSave }) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-gray-950">
+        <div className="flex-1 overflow-auto bg-gray-950 flex flex-col">
           {missing ? (
             <p className="text-gray-500 italic p-6 text-center">
               Sin contenido para mostrar
             </p>
+          ) : conflicted ? (
+            <ConflictResolver
+              content={content}
+              sides={conflictSides(repo)}
+              onEditManually={() => { setDraft(content); setEditing(true); }}
+              onApply={(resolved, markResolved) => {
+                onSave?.(file.name, resolved);
+                if (markResolved) {
+                  onMarkResolved?.(file.name);
+                  onClose?.();
+                }
+              }}
+            />
           ) : editing ? (
             <textarea
               autoFocus
@@ -159,7 +198,7 @@ export default function FileViewer({ file, repo, onClose, onSave }) {
           )}
         </div>
 
-        {canEdit && !editing && !missing && (
+        {canEdit && !editing && !missing && !conflicted && (
           <div className="px-4 py-2 bg-gray-850 border-t border-gray-700 text-[11px] text-gray-500">
             Edita el archivo y haz <code className="text-gray-400">git add</code> + <code className="text-gray-400">git diff</code> para ver tus cambios.
           </div>

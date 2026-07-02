@@ -48,6 +48,34 @@ window.addEventListener('beforeunload', flush);
 setInterval(flush, 30_000);
 `;
 
+// Tabla de precios para la lección de rebase con conflicto (m4-l5b).
+// Las tres versiones difieren SOLO en la línea nueva que cada uno añade,
+// para que "conservar ambos" produzca un archivo final con sentido.
+export const PRECIOS_BASE = `// Planes de TaskFlow.
+export const PLANES = [
+  { id: 'free',       precio: 0 },
+  { id: 'pro',        precio: 9 },
+];
+`;
+
+// Tu commit en feature/precios: añades el plan anual con descuento.
+export const PRECIOS_TUYO = `// Planes de TaskFlow.
+export const PLANES = [
+  { id: 'free',       precio: 0 },
+  { id: 'pro',        precio: 9 },
+  { id: 'anual',      precio: 90 },
+];
+`;
+
+// El commit del compañero en main: añade el plan enterprise en la misma zona.
+export const PRECIOS_COMPANERO = `// Planes de TaskFlow.
+export const PLANES = [
+  { id: 'free',       precio: 0 },
+  { id: 'pro',        precio: 9 },
+  { id: 'enterprise', precio: 49 },
+];
+`;
+
 export const NOTIFICATIONS_JS = `// Notificaciones in-app.
 // Versión simple: panel emergente abajo a la derecha.
 

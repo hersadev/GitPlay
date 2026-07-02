@@ -8,8 +8,18 @@ import {
   lastArg,
   fileOnBranch,
   isDetached,
+  rebaseInProgress,
+  branchFileMatches,
+  rebasedOnto,
 } from '../_helpers';
-import { DASHBOARD_JSX, METRICS_JS, NOTIFICATIONS_JS } from './fixtures';
+import {
+  DASHBOARD_JSX,
+  METRICS_JS,
+  NOTIFICATIONS_JS,
+  PRECIOS_BASE,
+  PRECIOS_TUYO,
+  PRECIOS_COMPANERO,
+} from './fixtures';
 
 export const module4 = [
   {
@@ -106,6 +116,64 @@ export const module4 = [
     setupFiles: { 'Dashboard.jsx': DASHBOARD_JSX, 'metrics.js': METRICS_JS },
     curiosity:
       'Rebase no "mueve" commits: los reescribe uno a uno encima de la otra rama, generando hashes nuevos. Por eso nunca debes rebasear commits que ya estén en remoto compartido (les cambia la identidad a los demás).',
+  },
+  {
+    id: 'm4-l5b',
+    title: 'Rebase con conflicto: quédate con ambos',
+    description:
+      'Mientras añadías el plan anual en `feature/precios`, tu compañero metió el plan enterprise en main tocando la MISMA zona de `precios.js`. Al rebasear, Git no puede decidir solo y verás los marcadores `<<<<<<<` en pantalla. Resuélvelo con el resolutor visual eligiendo CONSERVAR AMBOS cambios, y termina con `git rebase --continue`.',
+    objectives: [
+      {
+        label: 'Cambiarte a feature/precios (tu rama, ya con tu commit)',
+        validate: onBranch('feature/precios'),
+      },
+      {
+        label: 'Rebasear sobre main y toparte con el conflicto',
+        validate: (s) =>
+          rebaseInProgress(s) ||
+          branchFileMatches('feature/precios', 'precios.js', /enterprise/)(s),
+      },
+      {
+        label: 'Conservar AMBOS cambios y completar con git rebase --continue',
+        validate: (s) =>
+          !rebaseInProgress(s) &&
+          rebasedOnto('feature/precios', 'main')(s) &&
+          branchFileMatches('feature/precios', 'precios.js', /enterprise/)(s) &&
+          branchFileMatches('feature/precios', 'precios.js', /anual/)(s),
+      },
+    ],
+    hints: [
+      'git switch feature/precios',
+      'git rebase main   → CONFLICTO en precios.js (se abre el resolutor visual)',
+      'Pulsa "Conservar ambos": quieres el plan anual Y el enterprise',
+      'El botón verde guarda y ejecuta git add por ti (también puedes: git add precios.js)',
+      'git rebase --continue   → historia lineal con los dos planes',
+    ],
+    // Prepara el escenario: base común, tu commit en feature/precios y el del
+    // compañero en main (idempotente: si la rama ya existe, no toca nada).
+    setup: (engine) => {
+      if (!engine.initialized) return;
+      if (engine.branches.has('feature/precios')) return;
+      if (!engine.branches.get('main')) return;
+      engine.seedLocalCommit('main', {
+        message: 'feat: tabla de precios',
+        files: { 'precios.js': PRECIOS_BASE },
+        author: 'Tú',
+      });
+      engine.seedBranch('feature/precios', 'main');
+      engine.seedLocalCommit('feature/precios', {
+        message: 'feat: plan anual con descuento',
+        files: { 'precios.js': PRECIOS_TUYO },
+        author: 'Tú',
+      });
+      engine.seedLocalCommit('main', {
+        message: 'feat: plan enterprise',
+        files: { 'precios.js': PRECIOS_COMPANERO },
+        author: 'compañero',
+      });
+    },
+    curiosity:
+      'En un rebase las etiquetas se invierten: `<<<<<<< HEAD` es la rama base (¡el trabajo de tu compañero!) y `>>>>>>>` es TU commit reaplicado. Es al revés que en un merge y confunde hasta a gente con años de experiencia — por eso el resolutor te dice de quién es cada lado.',
   },
   {
     id: 'm4-l6',

@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { exportProgress, importProgress } from '../../utils/persistence';
 import { COMMAND_NAMES } from '../../utils/commandInfo';
+import ConfirmDialog from '../ui/ConfirmDialog';
 
 export default function Header({
   onReset,
@@ -19,11 +21,11 @@ export default function Header({
 }) {
   const fileInputRef = useRef(null);
   const [justSaved, setJustSaved] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
 
-  function handleReset() {
-    if (window.confirm('¿Reiniciar todo el progreso? Perderás el repositorio, la lección actual y los logros.')) {
-      onReset?.();
-    }
+  function handleConfirmReset() {
+    setConfirmResetOpen(false);
+    onReset?.();
   }
 
   function handleExport() {
@@ -151,12 +153,27 @@ export default function Header({
           className="hidden"
         />
         <button
-          onClick={handleReset}
+          onClick={() => setConfirmResetOpen(true)}
           className="text-gray-500 hover:text-red-400 transition-colors text-xs border border-gray-700 hover:border-red-800 px-2 py-1 rounded"
         >
           Reiniciar
         </button>
       </nav>
+
+      <AnimatePresence>
+        {confirmResetOpen && (
+          <ConfirmDialog
+            title="¿Reiniciar todo el progreso?"
+            message="Perderás el repositorio, la lección actual, los logros y tu libreta de comandos. Esta acción no se puede deshacer."
+            hint="💡 Consejo: puedes descargar una copia antes con el botón 💾 Guardar."
+            confirmLabel="Sí, reiniciar"
+            cancelLabel="Cancelar"
+            danger
+            onConfirm={handleConfirmReset}
+            onCancel={() => setConfirmResetOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </header>
   );
 }
