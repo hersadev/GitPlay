@@ -1,4 +1,4 @@
-// Módulo 2 — Features en ramas (7 lecciones)
+// Módulo 2 — Features en ramas (8 lecciones)
 // Implementas login y dark-mode en ramas separadas, las listas, mergeas y limpias.
 
 import {
@@ -8,7 +8,7 @@ import {
   fileOnBranch,
   hasMergeInBranch,
 } from '../_helpers';
-import { LOGIN_JSX, DARK_MODE_JS, CHANGELOG_MD } from './fixtures';
+import { LOGIN_JSX, DARK_MODE_JS, SETTINGS_JS, CHANGELOG_MD } from './fixtures';
 
 export const module2 = [
   {
@@ -90,6 +90,35 @@ export const module2 = [
   },
   {
     id: 'm2-l5',
+    title: 'La forma clásica: git checkout -b (feature/settings)',
+    description:
+      'Antes de que existiera `git switch`, la forma habitual de crear-y-entrar era `git checkout -b <rama>`. Sigue funcionando y la verás en montones de tutoriales, así que conviene reconocerla. Crea la pantalla de ajustes con ella.',
+    objectives: [
+      {
+        label: 'Crear la rama feature/settings con checkout -b',
+        validate: hasBranch('feature/settings'),
+      },
+      {
+        label: 'Estar en feature/settings',
+        validate: onBranch('feature/settings'),
+      },
+      {
+        label: 'Commitear settings.js en feature/settings',
+        validate: fileOnBranch('settings.js', 'feature/settings'),
+      },
+    ],
+    hints: [
+      'Vuelve a main primero si no estás: git switch main',
+      'git checkout -b feature/settings   (equivale a git switch -c)',
+      'git add settings.js',
+      'git commit -m "feat: pantalla de ajustes"',
+    ],
+    setupFiles: { 'settings.js': SETTINGS_JS },
+    curiosity:
+      '`git checkout -b` y `git switch -c` hacen exactamente lo mismo: crear la rama y mover HEAD a ella. `switch` (Git 2.23, 2019) nació para separar responsabilidades del sobrecargado `checkout`, que también sirve para descartar cambios o poner HEAD desacoplado. Por eso hoy se recomienda `switch` en código y material nuevo, aunque `checkout -b` no está deprecado.',
+  },
+  {
+    id: 'm2-l6',
     title: 'Listar las ramas',
     description:
       'Cuando tienes varias features en paralelo, `git branch` te orienta: lista todas las ramas locales y marca con `*` en cuál estás.',
@@ -106,7 +135,7 @@ export const module2 = [
       'Hasta 2020 la rama por defecto se llamaba `master`. GitHub la cambió a `main` y Git lo hizo configurable. Puedes elegir el nombre por defecto con `git config --global init.defaultBranch main`.',
   },
   {
-    id: 'm2-l6',
+    id: 'm2-l7',
     title: 'Merge fast-forward de feature/login',
     description:
       'El login está terminado. Vuelve a main y mergea: como main no avanzó mientras tanto, Git solo mueve el puntero — es un "fast-forward", sin commit de merge.',
@@ -126,7 +155,7 @@ export const module2 = [
       'En un fast-forward Git no crea ningún commit nuevo: solo mueve la "etiqueta" de la rama hacia adelante. Si quieres forzar un commit de merge aunque sea fast-forward, usa `git merge --no-ff`.',
   },
   {
-    id: 'm2-l7',
+    id: 'm2-l8',
     title: 'Merge 3-way y limpiar la rama',
     description:
       'Mientras tú trabajabas en dark-mode, otro dev actualizó el CHANGELOG en main. Ahora las dos ramas divergieron: el merge ya no es fast-forward, Git crea un commit de merge. Después, elimina la rama integrada con `branch -d`.',

@@ -9,7 +9,7 @@ import LessonSelector from './components/lesson/LessonSelector';
 import StatusPanel from './components/status/StatusPanel';
 import FileViewer from './components/files/FileViewer';
 import BadgesPanel from './components/badges/BadgesPanel';
-import BadgeToast from './components/badges/BadgeToast';
+import BadgeModal from './components/badges/BadgeModal';
 import GitHubView from './components/github/GitHubView';
 import { useGitStore } from './store/gitStore';
 import { useGitEngine } from './hooks/useGitEngine';
@@ -64,6 +64,7 @@ export default function App() {
     repoState,
     lessonIndex,
     totalLessons: ALL_LESSONS.length,
+    isComplete,
   });
 
   // Persist lesson index whenever it changes
@@ -256,7 +257,7 @@ export default function App() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {recent && <BadgeToast badge={recent} onClose={dismissRecent} />}
+        {recent && <BadgeModal badge={recent} onClose={dismissRecent} />}
       </AnimatePresence>
     </MainLayout>
   );

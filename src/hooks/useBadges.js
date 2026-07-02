@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BADGES, loadEarnedBadges, saveEarnedBadges, clearEarnedBadges } from '../utils/badges';
 
-export function useBadges({ repoState, lessonIndex, totalLessons }) {
+export function useBadges({ repoState, lessonIndex, totalLessons, isComplete }) {
   const [earned, setEarned] = useState(() => loadEarnedBadges());
-  const [recent, setRecent] = useState(null); // último badge ganado (para toast)
-  const recentTimer = useRef(null);
+  const [queue, setQueue] = useState([]); // logros recién ganados pendientes de anunciar
 
   useEffect(() => {
-    const ctx = { repoState, lessonIndex, totalLessons };
+    const ctx = { repoState, lessonIndex, totalLessons, isComplete };
     const newly = [];
     const next = new Set(earned);
     for (const b of BADGES) {
@@ -24,18 +23,21 @@ export function useBadges({ repoState, lessonIndex, totalLessons }) {
     if (newly.length) {
       setEarned(next);
       saveEarnedBadges(next);
-      // Mostrar el último badge desbloqueado en un toast
-      setRecent(newly[newly.length - 1]);
-      if (recentTimer.current) clearTimeout(recentTimer.current);
-      recentTimer.current = setTimeout(() => setRecent(null), 3500);
+      // Encolar los logros desbloqueados para anunciarlos uno a uno en el modal
+      setQueue((q) => [...q, ...newly]);
     }
-  }, [repoState, lessonIndex, totalLessons]);
+  }, [repoState, lessonIndex, totalLessons, isComplete]);
 
   function reset() {
     clearEarnedBadges();
     setEarned(new Set());
-    setRecent(null);
+    setQueue([]);
   }
 
-  return { earned, recent, reset, dismissRecent: () => setRecent(null) };
+  return {
+    earned,
+    recent: queue[0] ?? null, // logro que se está anunciando ahora
+    reset,
+    dismissRecent: () => setQueue((q) => q.slice(1)),
+  };
 }
