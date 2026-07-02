@@ -1,4 +1,5 @@
-import { generateHash, resetHashCounter, setHashCounter } from '../utils/hashGenerator.js';
+import { generateHash, resetHashCounter, markHashesUsed } from '../utils/hashGenerator.js';
+import { parseIgnoreRules, matchesIgnore } from '../utils/ignore.js';
 
 export class GitEngine {
   constructor() {
@@ -72,9 +73,7 @@ export class GitEngine {
     this.remoteRefs = data.remoteRefs instanceof Map ? data.remoteRefs : new Map();
     this.pullRequests = Array.isArray(data.pullRequests) ? data.pullRequests : [];
     this.prCounter = data.prCounter ?? this.pullRequests.length;
-    const allHashes = [...this.commits.keys(), ...this.remoteCommits.keys()].map((h) => parseInt(h, 16));
-    const maxHash = Math.max(0, ...allHashes);
-    setHashCounter(maxHash);
+    markHashesUsed([...this.commits.keys(), ...this.remoteCommits.keys()]);
   }
 
   // ── API pública para lecciones ────────────────────────────────────────
@@ -92,12 +91,17 @@ export class GitEngine {
     }
   }
 
-  // Permite a una lección programar una edición sobre un archivo existente:
+  // Permite a una lección (o al editor de archivos) modificar un archivo:
   // si está en staging o en el árbol, lo "modifica" trayéndolo al working dir.
   editFile(name, content) {
     const tree = this._currentTree();
-    const existing = this.stagingArea.get(name) ?? tree.get(name) ?? '';
-    if (existing === content) return;
+    const base = this.stagingArea.get(name) ?? tree.get(name);
+    if (content === base) {
+      // Igual que la versión guardada: ya no hay cambios locales pendientes.
+      // (Importante al resolver conflictos eligiendo exactamente "nuestra" versión.)
+      this.workingDirectory.delete(name);
+      return;
+    }
     this.workingDirectory.set(name, content);
   }
 
@@ -149,17 +153,48 @@ export class GitEngine {
     if (!args.length) return { ok: false, output: 'Uso: git add <archivo>\n       git add .' };
     this._setLast('add', args);
 
-    // git add .  → añade todo el working directory.
+    // git add .  → añade todo el working directory (menos lo ignorado).
     if (args.includes('.')) {
-      const files = [...this.workingDirectory.keys()];
-      if (!files.length && this.stagingArea.size === 0) {
-        return { ok: false, output: 'No hay cambios para añadir.' };
-      }
+      const files = [...this.workingDirectory.keys()].filter((f) => !this._isIgnored(f));
       files.forEach((f) => {
         this.stagingArea.set(f, this.workingDirectory.get(f));
         this.workingDirectory.delete(f);
       });
+      // Conflictos resueltos dejando la versión de HEAD tal cual: marcarlos también.
+      if (this.mergeState) {
+        const tree = this._currentTree();
+        for (const f of this.mergeState.conflicts) {
+          if (!this.stagingArea.has(f)) this.stagingArea.set(f, tree.get(f) ?? '');
+        }
+      }
       return { ok: true, output: '' };
+    }
+
+    // Validar primero: si algún archivo no existe, no se añade nada (como git real).
+    const tree = this._currentTree();
+    const unknown = args.filter(
+      (t) => !this.workingDirectory.has(t) && !this.stagingArea.has(t) && !tree.has(t)
+    );
+    if (unknown.length) {
+      return {
+        ok: false,
+        output: unknown
+          .map((t) => `fatal: ruta '${t}' no coincidió con ningún archivo`)
+          .concat('Pista: mira los archivos disponibles con `ls` o en el panel derecho.')
+          .join('\n'),
+      };
+    }
+
+    // Archivos ignorados por .gitignore: Git se niega a añadirlos.
+    const ignored = args.filter((t) => this._isIgnored(t));
+    if (ignored.length) {
+      return {
+        ok: false,
+        output:
+          `Las siguientes rutas están ignoradas por tu archivo .gitignore:\n` +
+          ignored.map((f) => `  ${f}`).join('\n') +
+          `\nPista: para eso existe .gitignore — estos archivos no deben commitearse.`,
+      };
     }
 
     // git add <a> <b> <c>  → procesa cada uno.
@@ -167,19 +202,36 @@ export class GitEngine {
       if (this.workingDirectory.has(target)) {
         this.stagingArea.set(target, this.workingDirectory.get(target));
         this.workingDirectory.delete(target);
-        continue;
+      } else if (this.mergeState?.conflicts?.has(target) && !this.stagingArea.has(target)) {
+        // Conflicto resuelto dejando la versión de HEAD: marcarlo como resuelto.
+        this.stagingArea.set(target, tree.get(target) ?? '');
       }
-      if (this.stagingArea.has(target)) continue;
-      // Compat: permitir añadir un archivo "imaginario" sin contenido.
-      this.stagingArea.set(target, '');
+      // Ya en staging o sin cambios respecto al commit: no-op, como git real.
     }
+    return { ok: true, output: '' };
+  }
+
+  // Crea un archivo en el working directory (comando `touch` del terminal).
+  createFile(name) {
+    if (
+      this.workingDirectory.has(name) ||
+      this.stagingArea.has(name) ||
+      this._currentTree().has(name)
+    ) {
+      return { ok: true, output: '' };
+    }
+    this.workingDirectory.set(name, '');
     return { ok: true, output: '' };
   }
 
   commit(args) {
     if (!this.initialized) return this._notInit();
+    if (args.includes('--amend')) return this._commitAmend(args);
     const mIdx = args.indexOf('-m');
-    if (mIdx === -1 || args[mIdx + 1] === undefined) return { ok: false, output: 'Uso: git commit -m "mensaje"' };
+    // Al concluir un merge se permite `git commit` sin -m: Git usa el mensaje por defecto.
+    if ((mIdx === -1 || args[mIdx + 1] === undefined) && !this.mergeState) {
+      return { ok: false, output: 'Uso: git commit -m "mensaje"\n       git commit --amend -m "mensaje"' };
+    }
 
     // Si estamos en medio de un merge, exigir que todos los conflictos estén resueltos.
     if (this.mergeState) {
@@ -198,7 +250,9 @@ export class GitEngine {
       return { ok: false, output: `En la rama ${this.HEAD}\nNada que hacer commit, el árbol de trabajo está limpio` };
     }
 
-    const message = args.slice(mIdx + 1).join(' ').replace(/^["']|["']$/g, '');
+    const message = mIdx === -1
+      ? ''
+      : args.slice(mIdx + 1).join(' ').replace(/^["']|["']$/g, '');
     const parentHash = this._currentCommitHash();
     const hash = generateHash();
 
@@ -239,6 +293,53 @@ export class GitEngine {
     return { ok: true, output: `[${this.HEAD} ${hash}] ${finalMessage}\n${changedFiles.length} archivo(s) cambiado(s)` };
   }
 
+  // git commit --amend [-m "mensaje"]: reemplaza el último commit.
+  // Mismo padre, árbol = árbol anterior + staging; sin -m conserva el mensaje.
+  _commitAmend(args) {
+    if (this.mergeState) {
+      return { ok: false, output: 'fatal: no puedes hacer --amend en medio de un merge.' };
+    }
+    const oldHash = this._currentCommitHash();
+    if (!oldHash) return { ok: false, output: 'No hay ningún commit que enmendar todavía.' };
+    const old = this.commits.get(oldHash);
+
+    const mIdx = args.indexOf('-m');
+    const message = mIdx !== -1 && args[mIdx + 1] !== undefined
+      ? args.slice(mIdx + 1).filter((a) => a !== '--amend').join(' ').replace(/^["']|["']$/g, '')
+      : old.message;
+
+    const newTree = new Map(old.tree instanceof Map ? old.tree : new Map());
+    const changed = new Set(old.files ?? []);
+    for (const [name, content] of this.stagingArea.entries()) {
+      newTree.set(name, content);
+      changed.add(name);
+    }
+
+    const hash = generateHash();
+    this.commits.set(hash, {
+      hash,
+      message,
+      parent: old.parent,
+      secondParent: old.secondParent ?? null,
+      timestamp: Date.now(),
+      author: 'Tú',
+      files: [...changed],
+      tree: newTree,
+    });
+
+    if (this._isDetached()) this.HEAD = hash;
+    else this.branches.set(this.HEAD, hash);
+
+    this.stagingArea = new Map();
+    // El commit antiguo queda huérfano (recuperable vía reflog), como en Git real.
+    this._addReflog(this.HEAD, hash, `commit (amend): ${message}`);
+    this._setLast('commit', args);
+    return {
+      ok: true,
+      output: `[${this.HEAD} ${hash}] ${message}\nEl commit ${oldHash} fue reemplazado (el hash cambió).`,
+    };
+  }
+
   status() {
     if (!this.initialized) return this._notInit();
     this._setLast('status', []);
@@ -260,18 +361,38 @@ export class GitEngine {
       }
     }
 
+    const tree = this._currentTree();
+
     if (this.stagingArea.size > 0) {
       lines.push('\nCambios para hacer commit:');
-      [...this.stagingArea.keys()].forEach((f) => lines.push(`  nuevo archivo:   ${f}`));
+      [...this.stagingArea.keys()].forEach((f) =>
+        lines.push(tree.has(f) ? `  modificado:      ${f}` : `  nuevo archivo:   ${f}`)
+      );
     }
-    if (this.workingDirectory.size > 0) {
+
+    // Working directory: distinguir modificados (trackeados) de sin seguimiento.
+    // Los archivos que matchean .gitignore no aparecen (como en git real).
+    const wdFiles = [...this.workingDirectory.keys()];
+    const modified = wdFiles.filter((f) => tree.has(f) || this.stagingArea.has(f));
+    const untracked = wdFiles.filter(
+      (f) => !tree.has(f) && !this.stagingArea.has(f) && !this._isIgnored(f)
+    );
+
+    if (modified.length > 0) {
       lines.push('\nCambios no preparados:');
-      [...this.workingDirectory.keys()].forEach((f) => lines.push(`  modificado:   ${f}`));
+      lines.push('  (usa "git add <archivo>" para actualizar lo que se commiteará)');
+      modified.forEach((f) => lines.push(`  modificado:   ${f}`));
+    }
+    if (untracked.length > 0) {
+      lines.push('\nArchivos sin seguimiento:');
+      lines.push('  (usa "git add <archivo>" para incluirlo en lo que se commiteará)');
+      untracked.forEach((f) => lines.push(`  ${f}`));
     }
     if (
       !this.mergeState &&
       this.stagingArea.size === 0 &&
-      this.workingDirectory.size === 0
+      modified.length === 0 &&
+      untracked.length === 0
     ) {
       lines.push('\nNada que hacer commit, el árbol de trabajo está limpio');
     }
@@ -367,7 +488,15 @@ export class GitEngine {
     }
     const name = args[0];
     if (this.branches.has(name)) return { ok: false, output: `error: la rama '${name}' ya existe.` };
-    this.branches.set(name, this._currentCommitHash());
+    // git branch <nombre> [<ref>]  → la ref opcional permite recuperar commits (reflog).
+    const startPoint = args[1] ? this._resolveRef(args[1]) : this._currentCommitHash();
+    if (args[1] && !startPoint) {
+      return { ok: false, output: `fatal: no es un nombre de objeto válido: '${args[1]}'` };
+    }
+    if (!startPoint) {
+      return { ok: false, output: `fatal: aún no hay commits en '${this.HEAD}'.\nCrea el primer commit antes de crear ramas.` };
+    }
+    this.branches.set(name, startPoint);
     return { ok: true, output: '' };
   }
 
@@ -523,20 +652,92 @@ export class GitEngine {
       mode = rest.shift();
     }
     const refArg = rest[0] ?? 'HEAD';
-    this._setLast('reset', [mode, refArg]);
 
     const targetHash = this._resolveRef(refArg);
-    if (targetHash === undefined) return { ok: false, output: `fatal: referencia ambigua '${refArg}'` };
+    if (!targetHash) {
+      // git reset <archivo>  → sacar el archivo del staging (como git real).
+      if (mode === '--mixed' && this.stagingArea.has(refArg)) {
+        this._unstageFile(refArg);
+        this._setLast('reset', ['--mixed', refArg]);
+        return { ok: true, output: `Cambios no preparados tras el reset:\nM\t${refArg}` };
+      }
+      return {
+        ok: false,
+        output: `fatal: argumento ambiguo '${refArg}': revisión o ruta desconocida.\nPista: mira los hashes disponibles con \`git log\` o \`git reflog\`.`,
+      };
+    }
+
+    if (mode === '--soft' && this.mergeState) {
+      return { ok: false, output: 'fatal: no se puede hacer un reset --soft en medio de un merge.' };
+    }
+    this._setLast('reset', [mode, refArg]);
 
     if (this._isDetached()) this.HEAD = targetHash;
     else this.branches.set(this.HEAD, targetHash);
 
-    if (mode === '--mixed' || mode === '--hard') this.stagingArea = new Map();
+    if (mode === '--mixed' || mode === '--hard') {
+      this.stagingArea = new Map();
+      this.mergeState = null; // reset aborta cualquier merge en curso
+    }
     if (mode === '--hard') this.workingDirectory = new Map();
 
     this._addReflog(this.HEAD, targetHash, `reset: moving to ${refArg}`);
     const modeLabel = { '--soft': 'soft', '--mixed': 'mixed', '--hard': 'hard' }[mode];
-    return { ok: true, output: `HEAD apunta ahora a ${targetHash ?? '(inicio)'} (modo ${modeLabel})` };
+    return { ok: true, output: `HEAD apunta ahora a ${targetHash} (modo ${modeLabel})` };
+  }
+
+  // git restore [--staged] <archivo>...
+  restore(args) {
+    if (!this.initialized) return this._notInit();
+    const staged = args.includes('--staged');
+    const files = args.filter((a) => !a.startsWith('-'));
+    if (!files.length) {
+      return { ok: false, output: 'Uso: git restore <archivo>          (descarta cambios del working directory)\n       git restore --staged <archivo> (saca el archivo del staging)' };
+    }
+    this._setLast('restore', args);
+
+    const tree = this._currentTree();
+    for (const f of files) {
+      if (staged) {
+        if (!this.stagingArea.has(f)) {
+          return { ok: false, output: `error: la ruta '${f}' no está en el staging.` };
+        }
+        this._unstageFile(f);
+      } else {
+        if (this.workingDirectory.has(f)) {
+          // Descartar la versión del working dir: vuelve la del staging/commit.
+          this.workingDirectory.delete(f);
+        } else if (!tree.has(f) && !this.stagingArea.has(f)) {
+          return { ok: false, output: `error: la ruta '${f}' no coincide con ningún archivo conocido.` };
+        }
+      }
+    }
+    return { ok: true, output: '' };
+  }
+
+  // Reglas activas de .gitignore (se lee del working dir, staging o árbol actual).
+  _ignoreRules() {
+    const content =
+      this.workingDirectory.get('.gitignore') ??
+      this.stagingArea.get('.gitignore') ??
+      this._currentTree().get('.gitignore');
+    return parseIgnoreRules(content);
+  }
+
+  // Un archivo solo puede ignorarse si aún no está trackeado (como en git real).
+  _isIgnored(name) {
+    if (this.stagingArea.has(name) || this._currentTree().has(name)) return false;
+    return matchesIgnore(name, this._ignoreRules());
+  }
+
+  // Saca un archivo del staging conservando su contenido si difiere del commit.
+  _unstageFile(name) {
+    const content = this.stagingArea.get(name);
+    this.stagingArea.delete(name);
+    const tree = this._currentTree();
+    if (tree.get(name) !== content) {
+      this.workingDirectory.set(name, content);
+    }
   }
 
   revert(args) {
@@ -746,14 +947,18 @@ export class GitEngine {
       };
     }
 
-    // Recolectar commits desde localHash hacia atrás que no estén en remoteCommits.
+    // Recolectar commits alcanzables desde localHash (ambos padres) que no estén en el remoto.
     const toPush = [];
-    let cur = localHash;
-    while (cur && !this.remoteCommits.has(cur)) {
+    const stack = [localHash];
+    const seen = new Set();
+    while (stack.length) {
+      const cur = stack.pop();
+      if (!cur || seen.has(cur) || this.remoteCommits.has(cur)) continue;
+      seen.add(cur);
       const c = this.commits.get(cur);
-      if (!c) break;
-      toPush.unshift(c);
-      cur = c.parent;
+      if (!c) continue;
+      toPush.push(c);
+      stack.push(c.parent, c.secondParent);
     }
     for (const c of toPush) {
       // Copia profunda de árbol y files.
@@ -785,17 +990,19 @@ export class GitEngine {
       const ref = `origin/${branch}`;
       const prev = this.remoteRefs.get(ref);
       this.remoteRefs.set(ref, hash);
-      // Copiar commits del remoto a local (alcanzables desde hash) si no estaban.
-      let cur = hash;
-      while (cur && !this.commits.has(cur)) {
+      // Copiar commits del remoto a local (alcanzables desde hash, ambos padres) si no estaban.
+      const stack = [hash];
+      while (stack.length) {
+        const cur = stack.pop();
+        if (!cur || this.commits.has(cur)) continue;
         const c = this.remoteCommits.get(cur);
-        if (!c) break;
+        if (!c) continue;
         this.commits.set(cur, {
           ...c,
           files: [...c.files],
           tree: c.tree instanceof Map ? new Map(c.tree) : new Map(),
         });
-        cur = c.parent;
+        stack.push(c.parent, c.secondParent);
       }
       if (prev !== hash) updates.push(`   ${(prev ?? '(nuevo)').slice(0, 7)}..${hash.slice(0, 7)}  ${branch} -> origin/${branch}`);
     }
@@ -880,18 +1087,18 @@ export class GitEngine {
     const id = ++this.prCounter;
     const fromHash = this.remoteBranches.get(from);
     const intoHash = this.remoteBranches.get(into);
-    // Commits únicos en from que no están en into.
-    const intoAncestors = new Set();
-    let cur = intoHash;
-    while (cur) {
-      intoAncestors.add(cur);
-      cur = this.remoteCommits.get(cur)?.parent ?? null;
-    }
+    // Commits únicos en from que no están en into (recorriendo ambos padres).
+    const intoAncestors = this._collectAncestors(intoHash, this.remoteCommits);
     const prCommits = [];
-    cur = fromHash;
-    while (cur && !intoAncestors.has(cur)) {
+    const stack = [fromHash];
+    const seen = new Set();
+    while (stack.length) {
+      const cur = stack.pop();
+      if (!cur || seen.has(cur) || intoAncestors.has(cur)) continue;
+      seen.add(cur);
       prCommits.push(cur);
-      cur = this.remoteCommits.get(cur)?.parent ?? null;
+      const c = this.remoteCommits.get(cur);
+      if (c) stack.push(c.parent, c.secondParent);
     }
     this.pullRequests.unshift({
       id,
@@ -987,32 +1194,58 @@ export class GitEngine {
       this._addReflog('HEAD', this.branches.get(target), `checkout: moverse de ${prev} a ${target}`);
       return { ok: true, output: `Cambiado a rama '${target}'` };
     }
-    if (this.commits.has(target)) {
-      this.HEAD = target;
-      this._addReflog('HEAD', target, `checkout: moverse a ${target} (HEAD desacoplado)`);
-      return { ok: true, output: `HEAD desacoplado en ${target}` };
+    // Acepta hash completo o abreviado (prefijo).
+    const hash = this._findCommit(target);
+    if (hash) {
+      this.HEAD = hash;
+      this._addReflog('HEAD', hash, `checkout: moverse a ${hash} (HEAD desacoplado)`);
+      return { ok: true, output: `HEAD desacoplado en ${hash}` };
     }
     return { ok: false, output: `error: pathspec '${target}' no coincide con ningún archivo o rama conocida.` };
   }
 
+  // Recorre AMBOS padres (merges incluidos): un merge commit desciende de las dos ramas.
   _isAncestor(ancestorHash, descendantHash, commitMap = this.commits) {
     if (!ancestorHash) return true;
-    let current = descendantHash;
+    const stack = [descendantHash];
     const visited = new Set();
-    while (current && !visited.has(current)) {
-      if (current === ancestorHash) return true;
-      visited.add(current);
-      current = commitMap.get(current)?.parent ?? null;
+    while (stack.length) {
+      const cur = stack.pop();
+      if (!cur || visited.has(cur)) continue;
+      if (cur === ancestorHash) return true;
+      visited.add(cur);
+      const c = commitMap.get(cur);
+      if (c) stack.push(c.parent, c.secondParent);
     }
     return false;
   }
 
+  _collectAncestors(hash, commitMap = this.commits) {
+    const out = new Set();
+    const stack = [hash];
+    while (stack.length) {
+      const cur = stack.pop();
+      if (!cur || out.has(cur)) continue;
+      out.add(cur);
+      const c = commitMap.get(cur);
+      if (c) stack.push(c.parent, c.secondParent);
+    }
+    return out;
+  }
+
   _findCommonAncestor(hashA, hashB) {
-    const ancestorsA = new Set();
-    let cur = hashA;
-    while (cur) { ancestorsA.add(cur); cur = this.commits.get(cur)?.parent ?? null; }
-    cur = hashB;
-    while (cur) { if (ancestorsA.has(cur)) return cur; cur = this.commits.get(cur)?.parent ?? null; }
+    const ancestorsA = this._collectAncestors(hashA);
+    // BFS desde B para encontrar el ancestro común más cercano a B.
+    const queue = [hashB];
+    const visited = new Set();
+    while (queue.length) {
+      const cur = queue.shift();
+      if (!cur || visited.has(cur)) continue;
+      if (ancestorsA.has(cur)) return cur;
+      visited.add(cur);
+      const c = this.commits.get(cur);
+      if (c) queue.push(c.parent, c.secondParent);
+    }
     return null;
   }
 
@@ -1025,8 +1258,8 @@ export class GitEngine {
       return hash;
     }
     if (this.branches.has(ref)) return this.branches.get(ref);
-    if (this.commits.has(ref)) return ref;
-    return null;
+    // Hash completo o abreviado.
+    return this._findCommit(ref);
   }
 
   _findCommit(ref) {

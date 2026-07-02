@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { GitEngine } from '../engine/GitEngine';
-import { loadRepo, saveRepo } from '../utils/persistence';
+import { loadRepo, saveRepo, loadUsedCommands, saveUsedCommands } from '../utils/persistence';
+import { COMMAND_INFO } from '../utils/commandInfo';
 
 const engine = new GitEngine();
 
@@ -12,34 +13,15 @@ const HELP_GENERAL = `GitPlay — comandos soportados en el simulador:
 
   Básicos:        init, clone, add, commit, status, log, diff
   Ramas:          branch, checkout, switch, merge
-  Historia:       reset, revert, stash, tag, cherry-pick, rebase, reflog
+  Historia:       restore, reset, revert, stash, tag, cherry-pick, rebase, reflog
   Remoto:         push, pull, fetch
+  Terminal:       ls, touch <archivo>, clear
 
 Ayuda específica: git <comando> --help    (p.ej. git commit --help)`;
 
-const HELP_BY_CMD = {
-  init: 'git init\n  Inicializa un repositorio Git vacío en la carpeta actual.',
-  clone: 'git clone <url>\n  Clona un repositorio remoto en local.',
-  add: 'git add <archivo> [<archivo>...]\ngit add .\n  Añade archivos al staging area (index).',
-  commit: 'git commit -m "<mensaje>"\n  Crea un commit con lo que hay en staging.',
-  status: 'git status\n  Muestra el estado: rama actual, archivos staged y sin preparar.',
-  log: 'git log\n  Muestra el historial de commits accesibles desde HEAD.',
-  diff: 'git diff [--staged]\n  Sin flags: working dir vs último commit.\n  --staged: staging vs último commit.',
-  push: 'git push [origin] [<rama>]\n  Sube los commits de la rama actual (o la indicada) a origin.',
-  pull: 'git pull [origin] [<rama>]\n  fetch + merge: trae cambios de origin y los integra en la rama actual.',
-  fetch: 'git fetch [origin]\n  Trae commits del remoto sin mergearlos. Actualiza origin/<rama>.',
-  branch: 'git branch              Lista las ramas.\ngit branch <nombre>     Crea una rama.\ngit branch -d <nombre>  Elimina una rama integrada.',
-  checkout: 'git checkout <rama|hash>\ngit checkout -b <rama>\n  Cambia de rama o hace HEAD desacoplado. -b crea y cambia.',
-  switch: 'git switch <rama>\ngit switch -c <rama>\n  Cambia de rama. -c crea y cambia en un paso.',
-  merge: 'git merge <rama>\n  Integra <rama> en la rama actual (fast-forward o 3-way).',
-  reset: 'git reset [--soft|--mixed|--hard] [<ref>]\n  Mueve HEAD. --soft mantiene staging; --mixed lo vacía; --hard borra todo.',
-  revert: 'git revert <hash>\n  Crea un nuevo commit que invierte los cambios del commit indicado.',
-  stash: 'git stash               Guarda cambios locales en una pila.\ngit stash pop           Recupera y elimina el último stash.\ngit stash list          Lista los stashes.\ngit stash drop          Descarta el último stash.',
-  tag: 'git tag                 Lista etiquetas.\ngit tag <nombre>        Crea una etiqueta sobre HEAD.\ngit tag -d <nombre>     Borra una etiqueta.',
-  'cherry-pick': 'git cherry-pick <hash>\n  Aplica el commit indicado sobre la rama actual.',
-  rebase: 'git rebase <rama>\n  Reaplica los commits de la rama actual sobre <rama>. Reescribe hashes.',
-  reflog: 'git reflog\n  Historial local de movimientos de HEAD (red de seguridad).',
-};
+const HELP_BY_CMD = Object.fromEntries(
+  Object.entries(COMMAND_INFO).map(([cmd, { usage, desc }]) => [cmd, `${usage}\n  ${desc}`])
+);
 
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
@@ -82,6 +64,7 @@ const COMMANDS = {
   checkout:       (e, args) => e.checkout(args),
   switch:         (e, args) => e.switch(args),
   merge:          (e, args) => e.merge(args),
+  restore:        (e, args) => e.restore(args),
   reset:          (e, args) => e.gitReset(args),
   revert:         (e, args) => e.revert(args),
   stash:          (e, args) => e.stash(args),
@@ -96,8 +79,9 @@ const COMMANDS = {
   clone:          (e, args) => e.clone(args),
 };
 
-export const useGitStore = create((set) => ({
+export const useGitStore = create((set, get) => ({
   repoState: engine.getState(),
+  usedCommands: loadUsedCommands(), // { comando: vecesUsado }
 
   applyCommand(parsed) {
     // git --help, git -h, git help  → ayuda general.
@@ -125,6 +109,13 @@ export const useGitStore = create((set) => ({
     let result;
     if (handler) {
       result = handler(engine, parsed.args);
+      // Registrar el comando en la libreta de repaso (solo si funcionó).
+      if (result.ok) {
+        const used = { ...get().usedCommands };
+        used[parsed.command] = (used[parsed.command] ?? 0) + 1;
+        set({ usedCommands: used });
+        saveUsedCommands(used);
+      }
     } else {
       const suggestion = suggestCommand(parsed.command);
       const hint = suggestion ? `\n¿Quisiste decir '${suggestion}'?` : '';
@@ -140,8 +131,16 @@ export const useGitStore = create((set) => ({
   resetRepo() {
     engine.clearState();
     const newState = engine.getState();
-    set({ repoState: newState });
+    set({ repoState: newState, usedCommands: {} });
     saveRepo(engine);
+    saveUsedCommands({});
+  },
+
+  createFile(name) {
+    const result = engine.createFile(name);
+    set({ repoState: engine.getState() });
+    saveRepo(engine);
+    return result;
   },
 
   seedFiles(files) {

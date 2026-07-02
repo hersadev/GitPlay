@@ -3,7 +3,7 @@ import { useState, useRef } from 'react';
 const COMMANDS = [
   'add', 'branch', 'checkout', 'cherry-pick', 'commit', 'diff',
   'fetch', 'init', 'log', 'merge', 'pull', 'push', 'rebase',
-  'reflog', 'reset', 'revert', 'stash', 'status', 'switch', 'tag',
+  'reflog', 'reset', 'restore', 'revert', 'stash', 'status', 'switch', 'tag',
   '--help', '-h', 'help',
 ];
 
@@ -54,7 +54,10 @@ function autocomplete(text, repoState) {
   }
 
   if (fileCmds.has(cmd)) {
-    const files = [...(repoState?.workingDirectory?.keys?.() ?? [])];
+    const files = [
+      ...(repoState?.workingDirectory?.keys?.() ?? []),
+      ...(repoState?.stagingArea?.keys?.() ?? []),
+    ];
     const m = files.filter((f) => f.startsWith(partial));
     if (m.length === 1) return before + m[0] + ' ';
     if (m.length > 1) {

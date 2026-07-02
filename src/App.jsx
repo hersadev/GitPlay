@@ -11,48 +11,54 @@ import FileViewer from './components/files/FileViewer';
 import BadgesPanel from './components/badges/BadgesPanel';
 import BadgeModal from './components/badges/BadgeModal';
 import GitHubView from './components/github/GitHubView';
+import CommandLog from './components/commands/CommandLog';
 import { useGitStore } from './store/gitStore';
 import { useGitEngine } from './hooks/useGitEngine';
 import { useTerminalHistory } from './hooks/useTerminalHistory';
 import { useLessonProgress } from './hooks/useLessonProgress';
 import { useBadges } from './hooks/useBadges';
 import { BADGES } from './utils/badges';
-import { saveLessonIndex, loadLessonIndex, clearProgress } from './utils/persistence';
-import { module1 } from './lessons/module1';
-import { module2 } from './lessons/module2';
-import { module3 } from './lessons/module3';
-import { module4 } from './lessons/module4';
-import { module5 } from './lessons/module5';
-import { moduleGithub } from './lessons/moduleGithub';
+import { splitChainedCommands } from './engine/CommandParser';
+import {
+  saveLessonIndex,
+  loadLessonIndex,
+  saveLessonMax,
+  loadLessonMax,
+  clearProgress,
+} from './utils/persistence';
+import { ALL_LESSONS } from './lessons';
 
 const clampWidth = (px, min, max) => Math.max(min, Math.min(max, px));
 
-// Orden pedagógico: ramas → GitHub → reescribir historia → equipo avanzado → escenarios reales.
-const ALL_LESSONS = [
-  ...module1,
-  ...module2,
-  ...moduleGithub,
-  ...module3,
-  ...module4,
-  ...module5,
-];
+// Lista los archivos "en disco": árbol del commit actual + staging + working dir.
+function listFiles(repo) {
+  const names = new Set();
+  const tipHash = repo.branches.get(repo.HEAD) ?? (repo.commits.has(repo.HEAD) ? repo.HEAD : null);
+  const tree = tipHash ? repo.commits.get(tipHash)?.tree : null;
+  if (tree instanceof Map) tree.forEach((_, name) => names.add(name));
+  repo.stagingArea.forEach((_, name) => names.add(name));
+  repo.workingDirectory.forEach((_, name) => names.add(name));
+  return [...names].sort().join('\n');
+}
 
 export default function App() {
   const { repoState, runCommand, resetRepo, seedFiles, editFile, runSetup } = useGitEngine();
-  const { lines, pushCommand, pushOutput } = useTerminalHistory();
+  const { lines, pushCommand, pushOutput, clear: clearTerminal } = useTerminalHistory();
 
   const [lessonIndex, setLessonIndex] = useState(() => loadLessonIndex());
+  const [maxReached, setMaxReached] = useState(() => Math.max(loadLessonIndex(), loadLessonMax()));
   const [showSuccess, setShowSuccess] = useState(false);
   const [sandboxMode, setSandboxMode] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [badgesOpen, setBadgesOpen] = useState(false);
+  const [commandsOpen, setCommandsOpen] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [openFile, setOpenFile] = useState(null); // { name, source: 'staged' | 'working' | 'commit', hash? }
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(240);
   const [terminalHeight, setTerminalHeight] = useState(192);
 
-  const { openPR, mergePR, closePR } = useGitStore();
+  const { openPR, mergePR, closePR, createFile, usedCommands } = useGitStore();
 
   // Track the previous isComplete value to detect false → true transitions only
   const prevIsComplete = useRef(false);
@@ -67,10 +73,14 @@ export default function App() {
     isComplete,
   });
 
-  // Persist lesson index whenever it changes
+  // Persist lesson index (y el máximo alcanzado, para el desbloqueo del selector)
   useEffect(() => {
     saveLessonIndex(lessonIndex);
-  }, [lessonIndex]);
+    if (lessonIndex > maxReached) {
+      setMaxReached(lessonIndex);
+      saveLessonMax(lessonIndex);
+    }
+  }, [lessonIndex, maxReached]);
 
   // Re-check objectives whenever repo state or lesson changes
   useEffect(() => {
@@ -84,47 +94,90 @@ export default function App() {
     if (typeof currentLesson.setup === 'function') runSetup(currentLesson.setup);
   }, [currentLesson?.id, seedFiles, runSetup]);
 
-  // Advance only when isComplete transitions false → true (not on initial load)
+  // Advance only when isComplete transitions false → true (not on initial load).
+  // Al completar la última lección avanza a ALL_LESSONS.length: el panel muestra
+  // la pantalla de graduación y la barra de progreso llega al 100%.
   useEffect(() => {
     const wasComplete = prevIsComplete.current;
     prevIsComplete.current = isComplete;
 
     if (!isComplete || wasComplete) return;
-    if (lessonIndex >= ALL_LESSONS.length - 1) return;
+    if (lessonIndex >= ALL_LESSONS.length) return;
 
     setShowSuccess(true);
     const timer = setTimeout(() => {
       setShowSuccess(false);
-      setLessonIndex((i) => i + 1);
+      setLessonIndex((i) => Math.min(i + 1, ALL_LESSONS.length));
     }, 2200);
 
     return () => clearTimeout(timer);
   }, [isComplete, lessonIndex]);
 
+  // Ejecuta una línea del terminal: soporta ls/touch/clear y comandos
+  // encadenados con && (como aparecen en muchas pistas).
   function handleCommand(input) {
     pushCommand(input);
-    const result = runCommand(input);
-    pushOutput(result.output, result.ok ? 'success' : 'error');
+    const parts = splitChainedCommands(input);
+
+    for (const part of parts) {
+      if (part === 'clear') {
+        clearTerminal();
+        continue;
+      }
+      if (part === 'ls') {
+        const repo = useGitStore.getState().repoState;
+        pushOutput(listFiles(repo) || '(no hay archivos todavía)', 'success');
+        continue;
+      }
+      if (part === 'touch' || part.startsWith('touch ')) {
+        const names = part.slice(5).trim().split(/\s+/).filter(Boolean);
+        if (!names.length) {
+          pushOutput('Uso: touch <archivo>', 'error');
+          return;
+        }
+        names.forEach((n) => createFile(n));
+        continue;
+      }
+      const result = runCommand(part);
+      if (result.output) pushOutput(result.output, result.ok ? 'success' : 'error');
+      // Como en la shell, && corta la cadena en el primer error.
+      if (!result.ok) return;
+    }
   }
 
   function handleReset() {
     clearProgress();
     resetRepo();
     resetBadges();
+    clearTerminal();
     setLessonIndex(0);
+    setMaxReached(0);
     prevIsComplete.current = false;
     setSandboxMode(false);
     setSelectorOpen(false);
     setBadgesOpen(false);
+    setCommandsOpen(false);
     // Forzar re-seed: si lessonIndex ya era 0, el useEffect no se redispararía.
     if (ALL_LESSONS[0]?.setupFiles) seedFiles(ALL_LESSONS[0].setupFiles);
   }
 
   function handleSelectLesson(index) {
+    if (index > maxReached) return; // bloqueada: aún no alcanzada
     setLessonIndex(index);
     setSandboxMode(false);
     setSelectorOpen(false);
     prevIsComplete.current = false;
+  }
+
+  // Las lecciones opcionales (puente a Git real) no tienen objetivos validables:
+  // se completan o saltan manualmente con los botones del panel.
+  function handleCompleteOptional() {
+    prevIsComplete.current = false;
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+      setLessonIndex((i) => Math.min(i + 1, ALL_LESSONS.length));
+    }, 1200);
   }
 
   function handleToggleSandbox() {
@@ -138,6 +191,8 @@ export default function App() {
       onOpenLessons={() => setSelectorOpen(true)}
       onToggleSandbox={handleToggleSandbox}
       onOpenBadges={() => setBadgesOpen(true)}
+      onOpenCommands={() => setCommandsOpen(true)}
+      usedCommandsCount={Object.keys(usedCommands).length}
       onOpenGithub={() => setGithubOpen(true)}
       openPRsCount={(repoState.pullRequests ?? []).filter((p) => p.state === 'open').length}
       sandboxMode={sandboxMode}
@@ -156,6 +211,9 @@ export default function App() {
           <p className="text-gray-400 text-sm">
             Sin objetivos, sin auto-avance. Prueba cualquier comando del motor: <code className="text-gray-300">init</code>, <code className="text-gray-300">commit</code>, <code className="text-gray-300">branch</code>, <code className="text-gray-300">merge</code>, <code className="text-gray-300">rebase</code>, <code className="text-gray-300">reflog</code>...
           </p>
+          <p className="text-gray-500 text-xs">
+            Crea archivos con <code className="text-gray-300">touch archivo.js</code>, lístalos con <code className="text-gray-300">ls</code> y limpia el terminal con <code className="text-gray-300">clear</code>.
+          </p>
           <p className="text-gray-500 text-xs mt-2">
             Pulsa <span className="text-yellow-400">Volver a lecciones</span> para retomar tu progreso.
           </p>
@@ -168,6 +226,7 @@ export default function App() {
           total={ALL_LESSONS.length}
           progress={completedCount}
           isComplete={isComplete}
+          onCompleteOptional={handleCompleteOptional}
         />
       )}
       </div>
@@ -232,6 +291,7 @@ export default function App() {
       {selectorOpen && (
         <LessonSelector
           currentIndex={lessonIndex}
+          maxUnlockedIndex={maxReached}
           onSelect={handleSelectLesson}
           onClose={() => setSelectorOpen(false)}
         />
@@ -240,6 +300,12 @@ export default function App() {
       <AnimatePresence>
         {badgesOpen && (
           <BadgesPanel earned={earned} onClose={() => setBadgesOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {commandsOpen && (
+          <CommandLog usedCommands={usedCommands} onClose={() => setCommandsOpen(false)} />
         )}
       </AnimatePresence>
 

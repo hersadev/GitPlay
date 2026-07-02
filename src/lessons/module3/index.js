@@ -14,6 +14,8 @@ import {
 } from '../_helpers';
 import {
   TASKS_JS,
+  FILTERS_JS,
+  GITIGNORE,
   NODE_MODULES,
   EXPERIMENTO_JS,
   API_JS,
@@ -44,7 +46,32 @@ export const module3 = [
     ],
     setupFiles: { 'tasks.js': TASKS_JS },
     curiosity:
-      'Cuando rehaces el último commit, también puedes usar `git commit --amend` para corregir mensaje o añadir archivos sin crear uno nuevo. Ojo: amend cambia el hash, así que evítalo si ya hiciste push a una rama compartida.',
+      'Cuando rehaces el último commit, también puedes usar `git commit --amend` para corregir mensaje o añadir archivos sin crear uno nuevo. De hecho, es la siguiente lección.',
+  },
+  {
+    id: 'm3-l1b',
+    title: 'commit --amend: el atajo para corregir',
+    description:
+      'Acabas de commitear los filtros de tareas con un mensaje pobre. En vez del rodeo con `reset --soft`, `git commit --amend -m "..."` reemplaza el último commit directamente: mismo contenido, mensaje nuevo. Ojo: cambia el hash, así que solo úsalo ANTES de hacer push.',
+    objectives: [
+      {
+        label: 'Commitear filters.js (con cualquier mensaje)',
+        validate: hasFileAnywhere('filters.js'),
+      },
+      {
+        label: 'Reescribir el mensaje con git commit --amend',
+        validate: lastArg('commit', '--amend'),
+      },
+    ],
+    hints: [
+      'git add filters.js',
+      'git commit -m "cosas"   (el típico mensaje que luego da vergüenza)',
+      'git commit --amend -m "feat: filtros de tareas por estado"',
+      'Mira git log: hay UN solo commit de filtros, con el mensaje nuevo y otro hash',
+    ],
+    setupFiles: { 'filters.js': FILTERS_JS },
+    curiosity:
+      '`--amend` también sirve para añadir archivos olvidados: haz `git add` de lo que faltó y repite `git commit --amend`. Si omites el -m, se conserva el mensaje original (en Git real eso es `--no-edit`). El commit antiguo no se borra al instante: queda huérfano y el reflog lo recuerda.',
   },
   {
     id: 'm3-l2',
@@ -69,6 +96,36 @@ export const module3 = [
     setupFiles: { 'node_modules': NODE_MODULES },
     curiosity:
       'El .gitignore solo ignora archivos que aún no están trackeados. Si ya commiteaste algo por error (como node_modules), tienes que sacarlo del index con `git rm --cached <archivo>` además de añadirlo al .gitignore.',
+  },
+  {
+    id: 'm3-l2b',
+    title: '.gitignore: que no vuelva a colarse',
+    description:
+      'Sacaste node_modules del staging, pero el error se repetirá salvo que se lo digas a Git de forma permanente. El archivo `.gitignore` lista lo que Git debe ignorar: dependencias, builds, logs. Ya lo tienes preparado en el working directory — commitéalo y comprueba que node_modules desaparece de `git status`.',
+    objectives: [
+      {
+        label: 'node_modules fuera del staging y sin commitear',
+        validate: (s) => !s.stagingArea.has('node_modules') && !hasFileAnywhere('node_modules')(s),
+      },
+      {
+        label: 'Commitear el archivo .gitignore',
+        validate: fileOnBranch('.gitignore', 'main'),
+      },
+      {
+        label: 'Verificar con git status que node_modules ya no aparece',
+        validate: lastCmd('status'),
+      },
+    ],
+    hints: [
+      'Abre .gitignore en el panel derecho: la primera regla es "node_modules"',
+      'git add .gitignore   (o git add . — fíjate: node_modules ya NO entra)',
+      'git commit -m "chore: añadir .gitignore"',
+      'git status → node_modules ya no sale como "sin seguimiento"',
+      'Prueba git add node_modules: ahora Git se niega',
+    ],
+    setupFiles: { '.gitignore': GITIGNORE, 'node_modules': NODE_MODULES },
+    curiosity:
+      'Cada línea del .gitignore es un patrón: `*.log` ignora todos los logs, `dist/` una carpeta entera, y `!importante.log` (con exclamación) crea una excepción. En gitignore.io hay plantillas listas para cada lenguaje y editor.',
   },
   {
     id: 'm3-l3',

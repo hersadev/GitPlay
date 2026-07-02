@@ -1,6 +1,8 @@
 // Definiciones de logros. Cada check recibe { repoState, lessonIndex, totalLessons, history }
 // y devuelve true cuando el badge se desbloquea.
 
+import { MODULES, ALL_LESSONS } from '../lessons';
+
 const STORAGE_KEY = 'gitplay:badges';
 
 export const BADGES = [
@@ -103,55 +105,31 @@ export const BADGES = [
     check: ({ repoState }) =>
       [...repoState.reflog].some((e) => /Merge resuelto/.test(e.message ?? '')),
   },
-  // Hitos por módulo. El umbral es el nº ACUMULADO de lecciones hasta terminar
-  // ese módulo (orden pedagógico), porque al completar la última lección de un
-  // módulo `lessonIndex` avanza a ese valor. Si cambias cuántas lecciones tiene
-  // un módulo, actualiza estos umbrales.
-  // Acumulados actuales: 7 (m1) · 15 (ramas) · 22 (github) · 30 (historia) · 36 (equipo) · 41 (total)
-  {
-    id: 'module-1',
-    name: 'Módulo 1 completado',
-    description: 'Termina "Arrancar TaskFlow" (7 lecciones).',
-    icon: '1️⃣',
-    check: ({ lessonIndex }) => lessonIndex >= 7,
-  },
-  {
-    id: 'module-2',
-    name: 'Módulo 2 completado',
-    description: 'Termina "Features en ramas" (8 lecciones).',
-    icon: '2️⃣',
-    check: ({ lessonIndex }) => lessonIndex >= 15,
-  },
-  {
-    id: 'module-3',
-    name: 'Módulo 3 completado',
-    description: 'Termina "Trabajar con GitHub" (7 lecciones).',
-    icon: '3️⃣',
-    check: ({ lessonIndex }) => lessonIndex >= 22,
-  },
-  {
-    id: 'module-4',
-    name: 'Módulo 4 completado',
-    description: 'Termina "Reescribir historia y releases" (8 lecciones).',
-    icon: '4️⃣',
-    check: ({ lessonIndex }) => lessonIndex >= 30,
-  },
-  {
-    id: 'module-5',
-    name: 'Módulo 5 completado',
-    description: 'Termina "Trabajo en equipo avanzado" (6 lecciones).',
-    icon: '5️⃣',
-    check: ({ lessonIndex }) => lessonIndex >= 36,
-  },
+  // Hitos por módulo: el umbral es el nº acumulado de lecciones hasta terminar
+  // ese módulo, calculado desde MODULES (se ajusta solo al añadir lecciones).
+  ...MODULES.map((m, i) => {
+    const threshold = MODULES.slice(0, i + 1).reduce((n, mod) => n + mod.lessons.length, 0);
+    const shortName = m.name.replace(/^Módulo \d+ — /, '');
+    const n = m.lessons.length;
+    return {
+      id: m.id,
+      name: `Módulo ${i + 1} completado`,
+      description: `Termina "${shortName}" (${n} ${n === 1 ? 'lección' : 'lecciones'}).`,
+      icon: m.icon,
+      check: ({ lessonIndex }) => lessonIndex >= threshold,
+    };
+  }),
   {
     id: 'graduate',
     name: 'Graduado',
-    description: 'Completa las 41 lecciones de GitPlay.',
+    // Se otorga al completar todas las lecciones NO opcionales (el puente a
+    // Git real es opcional y tiene su propio badge de módulo).
+    description: `Completa las ${ALL_LESSONS.filter((l) => !l.optional).length} lecciones del curso.`,
     icon: '🎓',
-    // La app no avanza más allá de la última lección, así que lessonIndex tope
-    // es totalLessons-1: se desbloquea al completar (isComplete) esa última.
-    check: ({ lessonIndex, totalLessons, isComplete }) =>
-      isComplete && lessonIndex >= totalLessons - 1,
+    check: ({ lessonIndex, isComplete }) => {
+      const core = ALL_LESSONS.filter((l) => !l.optional).length;
+      return lessonIndex >= core || (isComplete && lessonIndex >= core - 1);
+    },
   },
 ];
 

@@ -6,6 +6,8 @@ export default function MainLayout({
   onOpenLessons,
   onToggleSandbox,
   onOpenBadges,
+  onOpenCommands,
+  usedCommandsCount,
   onOpenGithub,
   openPRsCount,
   sandboxMode,
@@ -21,6 +23,8 @@ export default function MainLayout({
         onOpenLessons={onOpenLessons}
         onToggleSandbox={onToggleSandbox}
         onOpenBadges={onOpenBadges}
+        onOpenCommands={onOpenCommands}
+        usedCommandsCount={usedCommandsCount}
         onOpenGithub={onOpenGithub}
         openPRsCount={openPRsCount}
         sandboxMode={sandboxMode}

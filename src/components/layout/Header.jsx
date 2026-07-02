@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react';
 import { exportProgress, importProgress } from '../../utils/persistence';
+import { COMMAND_NAMES } from '../../utils/commandInfo';
 
 export default function Header({
   onReset,
   onOpenLessons,
   onToggleSandbox,
   onOpenBadges,
+  onOpenCommands,
+  usedCommandsCount = 0,
   onOpenGithub,
   openPRsCount = 0,
   sandboxMode,
@@ -95,6 +98,17 @@ export default function Header({
           <span>🏆</span>
           <span className="text-xs text-gray-500 font-mono">
             {earnedCount}/{totalBadges}
+          </span>
+        </button>
+        <button
+          onClick={onOpenCommands}
+          className="hover:text-blue-300 transition-colors flex items-center gap-1.5"
+          title="Tu libreta de comandos: repasa lo que ya has usado y qué hace cada uno"
+        >
+          <span>📖</span>
+          <span className="text-xs">Comandos</span>
+          <span className="text-xs text-gray-500 font-mono">
+            {usedCommandsCount}/{COMMAND_NAMES.length}
           </span>
         </button>
         <button

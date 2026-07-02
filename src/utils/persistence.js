@@ -1,5 +1,7 @@
 const REPO_KEY = 'gitplay:repo';
 const LESSON_KEY = 'gitplay:lesson';
+const LESSON_MAX_KEY = 'gitplay:lessonMax';
+const COMMANDS_KEY = 'gitplay:commands';
 const LEGACY_REPO_KEY = 'gitlern:repo';
 const LEGACY_LESSON_KEY = 'gitlern:lesson';
 
@@ -113,10 +115,39 @@ export function loadLessonIndex() {
   } catch (_) { return 0; }
 }
 
+// Índice de la lección más avanzada alcanzada (para desbloquear en el selector).
+export function saveLessonMax(index) {
+  try { localStorage.setItem(LESSON_MAX_KEY, String(index)); } catch (_) {}
+}
+
+export function loadLessonMax() {
+  try {
+    const raw = localStorage.getItem(LESSON_MAX_KEY);
+    // Compat: usuarios previos a esta clave desbloquean hasta su lección actual.
+    if (raw === null) return loadLessonIndex();
+    return Math.max(0, parseInt(raw) || 0);
+  } catch (_) { return 0; }
+}
+
+// Comandos git ya utilizados: { comando: vecesUsado }.
+export function loadUsedCommands() {
+  try {
+    const raw = localStorage.getItem(COMMANDS_KEY);
+    const data = raw ? JSON.parse(raw) : {};
+    return data && typeof data === 'object' ? data : {};
+  } catch (_) { return {}; }
+}
+
+export function saveUsedCommands(commands) {
+  try { localStorage.setItem(COMMANDS_KEY, JSON.stringify(commands)); } catch (_) {}
+}
+
 export function clearProgress() {
   try {
     localStorage.removeItem(REPO_KEY);
     localStorage.removeItem(LESSON_KEY);
+    localStorage.removeItem(LESSON_MAX_KEY);
+    localStorage.removeItem(COMMANDS_KEY);
     localStorage.removeItem(LEGACY_REPO_KEY);
     localStorage.removeItem(LEGACY_LESSON_KEY);
   } catch (_) {}
@@ -136,7 +167,9 @@ export function exportProgress() {
       savedAt: new Date().toISOString(),
       repo: localStorage.getItem(REPO_KEY),
       lesson: localStorage.getItem(LESSON_KEY),
+      lessonMax: localStorage.getItem(LESSON_MAX_KEY),
       badges: localStorage.getItem(BADGES_KEY),
+      commands: localStorage.getItem(COMMANDS_KEY),
     };
   } catch (_) {
     return null;
@@ -152,8 +185,12 @@ export function importProgress(data) {
     else localStorage.removeItem(REPO_KEY);
     if (typeof data.lesson === 'string') localStorage.setItem(LESSON_KEY, data.lesson);
     else localStorage.removeItem(LESSON_KEY);
+    if (typeof data.lessonMax === 'string') localStorage.setItem(LESSON_MAX_KEY, data.lessonMax);
+    else localStorage.removeItem(LESSON_MAX_KEY);
     if (typeof data.badges === 'string') localStorage.setItem(BADGES_KEY, data.badges);
     else localStorage.removeItem(BADGES_KEY);
+    if (typeof data.commands === 'string') localStorage.setItem(COMMANDS_KEY, data.commands);
+    else localStorage.removeItem(COMMANDS_KEY);
     return true;
   } catch (_) {
     return false;
