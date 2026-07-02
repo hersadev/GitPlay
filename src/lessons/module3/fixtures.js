@@ -28,6 +28,30 @@ export class TaskStore {
 }
 `;
 
+export const FILTERS_JS = `// Filtros de la lista de tareas: todas / pendientes / completadas.
+
+export function filterTasks(tasks, mode = 'all') {
+  switch (mode) {
+    case 'pending':
+      return tasks.filter((t) => !t.done);
+    case 'done':
+      return tasks.filter((t) => t.done);
+    default:
+      return tasks;
+  }
+}
+`;
+
+export const GITIGNORE = `# Dependencias instaladas por npm (se regeneran con npm install)
+node_modules
+
+# Carpeta de build (se regenera con npm run build)
+dist
+
+# Logs
+*.log
+`;
+
 export const NODE_MODULES = `// Marcador: en un proyecto real, node_modules es una carpeta
 // generada por npm install, con miles de archivos.
 // NUNCA debe commitearse: se añade al .gitignore.

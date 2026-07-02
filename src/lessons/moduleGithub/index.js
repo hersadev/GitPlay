@@ -20,6 +20,7 @@ import {
   README_LOCAL_EDIT,
   README_TEAMMATE_EDIT,
   FEATURE_FLAGS_JS,
+  DARK_TOGGLE_JS,
 } from './fixtures';
 
 export const moduleGithub = [
@@ -119,16 +120,17 @@ export const moduleGithub = [
     id: 'gh-l6',
     title: 'Conflicto al pullear',
     description:
-      'Tu compañera modificó el `README.md` y mergeó su PR. Mientras tanto, tú también lo editaste localmente. Al hacer `git pull` chocaréis: tendrás que resolver el conflicto a mano.',
+      'Tu compañera modificó el `README.md` y mergeó su PR. Mientras tanto, tú también lo editaste localmente. Al hacer `git pull` chocaréis: tendrás que resolver el conflicto a mano y subir el resultado con `git push`.',
     objectives: [
       { label: 'Tienes un commit local que toca README.md', validate: (s) => fileOnBranch('README.md', 'main')(s) },
-      { label: 'Después de pullear, el merge está resuelto (sin marcadores)', validate: (s) => mergeResolved(s) && branchSynced('main')(s) },
+      { label: 'Conflicto resuelto y pusheado (main sincronizado con origin)', validate: (s) => mergeResolved(s) && branchSynced('main')(s) },
     ],
     hints: [
       'Edita el README.md (pulsa sobre el archivo en el panel derecho → Editar) y haz un commit local',
       'git pull   (verás "CONFLICTO" en README.md)',
       'Abre README.md, quita los marcadores <<<<<<<, =======, >>>>>>> y guarda',
-      'git add README.md && git commit   (resuelve el merge)',
+      'git add README.md && git commit   (concluye el merge; el mensaje es opcional)',
+      'git push   (sube el merge: main y origin/main vuelven a estar iguales)',
     ],
     setupFiles: { 'README.md': README_BASE },
     setup: (engine) => {
@@ -156,11 +158,12 @@ export const moduleGithub = [
       { label: 'main local sincronizado con origin/main', validate: branchSynced('main') },
     ],
     hints: [
-      '1) Crea la rama y commitea un archivo: git switch -c feature/dark-toggle / git add / git commit',
+      '1) Crea la rama y commitea: git switch -c feature/dark-toggle && git add darkToggle.js && git commit -m "feat: toggle de tema"',
       '2) Súbela: git push origin feature/dark-toggle',
       '3) Abre y mergea el PR en la vista de GitHub (🐙)',
       '4) Vuelve a main y trae los cambios: git switch main && git pull',
     ],
+    setupFiles: { 'darkToggle.js': DARK_TOGGLE_JS },
     setup: (engine) => {
       // El "compañero" mete feature-flags.js en main (después de un push inicial del alumno).
       // Si la rama main aún no está en origin, no hace nada (idempotente).

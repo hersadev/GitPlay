@@ -1,3 +1,5 @@
+import { parseIgnoreRules, matchesIgnore } from '../../utils/ignore';
+
 function Section({ title, children }) {
   return (
     <div>
@@ -40,6 +42,19 @@ export default function StatusPanel({ repo, onOpenFile }) {
   }
 
   const conflicts = mergeState?.conflicts ? [...mergeState.conflicts] : [];
+
+  // Árbol del commit actual, para distinguir untracked (?) de modificado (~).
+  const currentTree = (() => {
+    const c = currentHash ? commits.get(currentHash) : null;
+    return c?.tree instanceof Map ? c.tree : new Map();
+  })();
+
+  // Reglas de .gitignore activas (mismo criterio que el motor).
+  const ignoreRules = parseIgnoreRules(
+    workingDirectory.get('.gitignore') ??
+    stagingArea.get('.gitignore') ??
+    currentTree.get('.gitignore')
+  );
 
   return (
     <aside className="w-60 flex flex-col gap-4 p-4 bg-gray-900 border-l border-gray-700 overflow-y-auto text-sm">
@@ -116,21 +131,41 @@ export default function StatusPanel({ repo, onOpenFile }) {
         )}
       </Section>
 
-      {/* Working directory */}
+      {/* Working directory: ~ modificado (trackeado) · ? sin seguimiento */}
       {workingDirectory.size > 0 && (
         <Section title="Sin preparar">
           <ul className="space-y-0.5">
-            {[...workingDirectory.keys()].map((f) => (
-              <li key={f} className="flex items-center gap-1.5 text-xs font-mono">
-                <span className="text-yellow-400 font-bold flex-shrink-0">~</span>
-                <button
-                  onClick={() => onOpenFile?.(f, 'working')}
-                  className="text-yellow-300 truncate hover:text-yellow-200 hover:underline text-left"
-                >
-                  {f}
-                </button>
-              </li>
-            ))}
+            {[...workingDirectory.keys()].map((f) => {
+              const tracked = currentTree.has(f) || stagingArea.has(f);
+              const ignored = !tracked && matchesIgnore(f, ignoreRules);
+              return (
+                <li key={f} className="flex items-center gap-1.5 text-xs font-mono">
+                  <span
+                    className={`font-bold flex-shrink-0 ${
+                      tracked ? 'text-yellow-400' : ignored ? 'text-gray-700' : 'text-gray-500'
+                    }`}
+                    title={tracked ? 'Modificado' : ignored ? 'Ignorado por .gitignore' : 'Sin seguimiento (untracked)'}
+                  >
+                    {tracked ? '~' : ignored ? '∅' : '?'}
+                  </span>
+                  <button
+                    onClick={() => onOpenFile?.(f, 'working')}
+                    className={`truncate hover:underline text-left ${
+                      tracked
+                        ? 'text-yellow-300 hover:text-yellow-200'
+                        : ignored
+                        ? 'text-gray-600 hover:text-gray-500 line-through'
+                        : 'text-gray-400 hover:text-gray-300'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                  {ignored && (
+                    <span className="text-[9px] text-gray-600 flex-shrink-0">ignorado</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </Section>
       )}

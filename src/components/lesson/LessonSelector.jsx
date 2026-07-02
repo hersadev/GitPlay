@@ -1,20 +1,6 @@
-import { module1 } from '../../lessons/module1';
-import { module2 } from '../../lessons/module2';
-import { module3 } from '../../lessons/module3';
-import { module4 } from '../../lessons/module4';
-import { module5 } from '../../lessons/module5';
-import { moduleGithub } from '../../lessons/moduleGithub';
+import { MODULES } from '../../lessons';
 
-const MODULES = [
-  { name: 'Módulo 1 — Arrancar TaskFlow', lessons: module1 },
-  { name: 'Módulo 2 — Features en ramas', lessons: module2 },
-  { name: 'Módulo 3 — Trabajar con GitHub', lessons: moduleGithub },
-  { name: 'Módulo 4 — Reescribir historia y releases', lessons: module3 },
-  { name: 'Módulo 5 — Trabajo en equipo avanzado', lessons: module4 },
-  { name: 'Módulo 6 — Escenarios reales', lessons: module5 },
-];
-
-export default function LessonSelector({ currentIndex, onSelect, onClose }) {
+export default function LessonSelector({ currentIndex, maxUnlockedIndex, onSelect, onClose }) {
   let offset = 0;
   const groups = MODULES.map((m) => {
     const items = m.lessons.map((l, i) => ({ ...l, globalIndex: offset + i }));
@@ -32,7 +18,12 @@ export default function LessonSelector({ currentIndex, onSelect, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between px-5 py-3 border-b border-gray-700">
-          <h2 className="text-white font-semibold">Selecciona una lección</h2>
+          <div>
+            <h2 className="text-white font-semibold">Selecciona una lección</h2>
+            <p className="text-xs text-gray-500">
+              Las lecciones se desbloquean en orden: cada una construye sobre la anterior.
+            </p>
+          </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white text-xl leading-none"
@@ -49,7 +40,8 @@ export default function LessonSelector({ currentIndex, onSelect, onClose }) {
                 {g.items.map((l) => {
                   const isCurrent = l.globalIndex === currentIndex;
                   const isPast = l.globalIndex < currentIndex;
-                  const icon = isCurrent ? '→' : isPast ? '✓' : '○';
+                  const isLocked = l.globalIndex > maxUnlockedIndex;
+                  const icon = isLocked ? '🔒' : isCurrent ? '→' : isPast ? '✓' : '○';
                   const iconColor = isCurrent
                     ? 'text-yellow-400'
                     : isPast
@@ -58,10 +50,14 @@ export default function LessonSelector({ currentIndex, onSelect, onClose }) {
                   return (
                     <li key={l.id}>
                       <button
-                        onClick={() => onSelect(l.globalIndex)}
-                        className={`w-full text-left px-3 py-2 rounded flex items-center gap-3 hover:bg-gray-800 transition-colors ${
-                          isCurrent ? 'bg-gray-800' : ''
-                        }`}
+                        onClick={() => !isLocked && onSelect(l.globalIndex)}
+                        disabled={isLocked}
+                        title={isLocked ? 'Completa las lecciones anteriores para desbloquearla' : undefined}
+                        className={`w-full text-left px-3 py-2 rounded flex items-center gap-3 transition-colors ${
+                          isLocked
+                            ? 'opacity-40 cursor-not-allowed'
+                            : 'hover:bg-gray-800'
+                        } ${isCurrent ? 'bg-gray-800' : ''}`}
                       >
                         <span className={`text-xs font-mono w-10 flex-shrink-0 ${iconColor}`}>
                           {icon} {String(l.globalIndex + 1).padStart(2, '0')}

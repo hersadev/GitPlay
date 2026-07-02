@@ -98,3 +98,20 @@ export function isEnabled(name) {
   return !!flags[name];
 }
 `;
+
+// Archivo para el workflow completo (gh-l7): toggle de tema oscuro.
+export const DARK_TOGGLE_JS = `// Toggle de tema oscuro persistido en localStorage.
+
+const KEY = 'taskflow:theme';
+
+export function initTheme() {
+  const saved = localStorage.getItem(KEY) ?? 'light';
+  document.documentElement.dataset.theme = saved;
+}
+
+export function toggleTheme() {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem(KEY, next);
+}
+`;

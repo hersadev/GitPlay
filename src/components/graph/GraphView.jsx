@@ -321,14 +321,14 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                   strokeWidth={1.5}
                   opacity={selectedHash && !isSelected ? 0.45 : 1}
                 />
-                {/* Hash */}
+                {/* Hash (abreviado a 4 para caber en el nodo; el completo va en el panel) */}
                 <text
                   x={pos.x} y={pos.y}
                   textAnchor="middle" dominantBaseline="middle"
                   fontSize={10} fontFamily="monospace" fontWeight="bold" fill="white"
                   opacity={selectedHash && !isSelected ? 0.45 : 1}
                 >
-                  {commit.hash}
+                  {commit.hash.slice(0, 4)}
                 </text>
                 {/* Message below */}
                 <text
