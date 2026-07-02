@@ -1,6 +1,6 @@
 const H_SPACING_MAX = 130;
 const H_SPACING_MIN = 80;
-const V_SPACING = 80;
+const V_SPACING = 90;
 const OFFSET_X = 80;
 const OFFSET_Y = 80;
 
@@ -50,10 +50,41 @@ export function computeLayout(commits, branches) {
     positions.set(c.hash, {
       x: xIndex.get(c.hash) * H_SPACING + OFFSET_X,
       y: rows.get(c.hash) * V_SPACING + OFFSET_Y,
+      // Columna cronológica: la vista la usa para escalonar los títulos
+      // de los commits en dos alturas y que no se pisen entre vecinos.
+      col: xIndex.get(c.hash),
     });
   });
 
   return positions;
+}
+
+// Asigna un "piso" (level) a cada etiqueta de rama/ref para que las de
+// commits vecinos de la misma fila no se solapen: barrido izquierda→derecha
+// reservando en cada piso el hueco horizontal ya ocupado.
+// items: [{ hash, pos: {x, y}, textWidth, ... }] — se devuelve mutado con
+// `level` y `isStackBase` (la etiqueta más baja de la pila de su commit).
+export function layoutRefLabels(items, gap = 8) {
+  items.sort((a, b) => (a.pos.y - b.pos.y) || (a.pos.x - b.pos.x));
+  let rowY = null;
+  let levelEnds = []; // fin (x) de la última etiqueta colocada en cada piso
+  for (const it of items) {
+    if (it.pos.y !== rowY) {
+      rowY = it.pos.y;
+      levelEnds = [];
+    }
+    const start = it.pos.x - it.textWidth / 2;
+    let level = 0;
+    while (level < levelEnds.length && start < levelEnds[level] + gap) level++;
+    levelEnds[level] = it.pos.x + it.textWidth / 2;
+    it.level = level;
+  }
+  const minLevel = new Map();
+  for (const it of items) {
+    minLevel.set(it.hash, Math.min(minLevel.get(it.hash) ?? Infinity, it.level));
+  }
+  for (const it of items) it.isStackBase = it.level === minLevel.get(it.hash);
+  return items;
 }
 
 export function svgDimensions(positions) {

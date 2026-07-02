@@ -3,6 +3,7 @@ const LESSON_KEY = 'gitplay:lesson';
 const LESSON_MAX_KEY = 'gitplay:lessonMax';
 const COMMANDS_KEY = 'gitplay:commands';
 const WELCOME_KEY = 'gitplay:welcomed';
+const MODULE_INTROS_KEY = 'gitplay:moduleIntros';
 const LEGACY_REPO_KEY = 'gitlern:repo';
 const LEGACY_LESSON_KEY = 'gitlern:lesson';
 
@@ -24,7 +25,7 @@ export function saveRepo(engine) {
       HEAD: engine.HEAD,
       stagingArea: [...engine.stagingArea.entries()],
       workingDirectory: [...engine.workingDirectory.entries()],
-      stash: engine.stash.map(s => ({
+      stash: engine.stashEntries.map(s => ({
         message: s.message,
         stagingArea: [...s.stagingArea.entries()],
         workingDirectory: [...s.workingDirectory.entries()],
@@ -161,6 +162,7 @@ export function clearProgress() {
     localStorage.removeItem(LESSON_MAX_KEY);
     localStorage.removeItem(COMMANDS_KEY);
     localStorage.removeItem(WELCOME_KEY);
+    localStorage.removeItem(MODULE_INTROS_KEY);
     localStorage.removeItem(LEGACY_REPO_KEY);
     localStorage.removeItem(LEGACY_LESSON_KEY);
   } catch (_) {}
@@ -173,6 +175,20 @@ export function loadWelcomeSeen() {
 
 export function saveWelcomeSeen() {
   try { localStorage.setItem(WELCOME_KEY, '1'); } catch (_) {}
+}
+
+// Módulos cuyo aviso de comandos ya se mostró (ids de módulo).
+// Así el modal sale UNA sola vez al empezar cada módulo, y no en cada
+// recarga o al volver a entrar en él desde el selector.
+export function loadSeenModuleIntros() {
+  try {
+    const data = JSON.parse(localStorage.getItem(MODULE_INTROS_KEY) ?? '[]');
+    return Array.isArray(data) ? data : [];
+  } catch (_) { return []; }
+}
+
+export function saveSeenModuleIntros(ids) {
+  try { localStorage.setItem(MODULE_INTROS_KEY, JSON.stringify(ids)); } catch (_) {}
 }
 
 const BADGES_KEY = 'gitplay:badges';
@@ -192,6 +208,7 @@ export function exportProgress() {
       lessonMax: localStorage.getItem(LESSON_MAX_KEY),
       badges: localStorage.getItem(BADGES_KEY),
       commands: localStorage.getItem(COMMANDS_KEY),
+      moduleIntros: localStorage.getItem(MODULE_INTROS_KEY),
     };
   } catch (_) {
     return null;
@@ -213,6 +230,8 @@ export function importProgress(data) {
     else localStorage.removeItem(BADGES_KEY);
     if (typeof data.commands === 'string') localStorage.setItem(COMMANDS_KEY, data.commands);
     else localStorage.removeItem(COMMANDS_KEY);
+    if (typeof data.moduleIntros === 'string') localStorage.setItem(MODULE_INTROS_KEY, data.moduleIntros);
+    else localStorage.removeItem(MODULE_INTROS_KEY);
     return true;
   } catch (_) {
     return false;

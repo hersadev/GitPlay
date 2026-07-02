@@ -1,110 +1,50 @@
 import { useMemo, useState } from 'react';
 import { parseConflictSegments, buildResolvedContent } from '../../utils/conflicts';
 
-// Resolutor visual de conflictos: muestra los bloques <<<<<<< / ======= / >>>>>>>
-// con colores y botones para elegir qué conservar (lo tuyo, lo del otro, o ambos),
-// sin tener que editar los marcadores a mano.
+// Resolutor visual de conflictos al estilo VSCode: el archivo se ve como
+// código normal (con números de línea y los marcadores <<<<<<< / ======= /
+// >>>>>>> visibles) y, encima de cada conflicto, una fila de acciones para
+// aceptar el cambio actual, el entrante o ambos — sin editar a mano.
 
 const CHOICE_LABEL = {
-  ours: 'la primera versión',
-  theirs: 'la segunda versión',
-  both: 'ambas versiones',
+  ours: 'el cambio actual',
+  theirs: 'el cambio entrante',
+  both: 'ambos cambios',
 };
 
-function Lines({ lines, tone }) {
-  const toneClass = {
-    ours: 'bg-green-950/60 text-green-100',
-    theirs: 'bg-blue-950/60 text-blue-100',
-    context: 'text-gray-400',
-    resolved: 'bg-gray-800/80 text-gray-100',
-  }[tone];
-  if (!lines.length) {
-    return (
-      <div className={`px-3 py-1 italic text-xs ${tone === 'context' ? 'text-gray-600' : toneClass}`}>
-        (sin líneas: esta versión deja la zona vacía)
-      </div>
-    );
-  }
-  return lines.map((line, i) => (
-    <div key={i} className={`px-3 whitespace-pre-wrap break-all leading-relaxed ${toneClass}`}>
-      {line || ' '}
+const TONE_CLASS = {
+  context: 'text-gray-300',
+  ours: 'bg-emerald-900/30 text-emerald-50',
+  oursMarker: 'bg-emerald-800/50 text-emerald-300',
+  theirs: 'bg-sky-900/30 text-sky-50',
+  theirsMarker: 'bg-sky-800/50 text-sky-300',
+  sep: 'bg-gray-800/60 text-gray-500',
+  resolved: 'text-gray-100 bg-green-950/20',
+};
+
+// Una línea de código con su número, como en un editor.
+function CodeLine({ lineNo, text, tone, note }) {
+  return (
+    <div className={`flex ${TONE_CLASS[tone]}`}>
+      <span className="select-none text-gray-600 w-12 text-right pr-3 flex-shrink-0">
+        {lineNo}
+      </span>
+      <span className="whitespace-pre-wrap break-all flex-1">
+        {text || ' '}
+        {note && (
+          <span className="select-none italic text-[11px] opacity-70 ml-3">({note})</span>
+        )}
+      </span>
     </div>
-  ));
+  );
 }
 
-function ConflictBlock({ index, total, segment, sides, choice, onChoose }) {
-  if (choice) {
-    const lines =
-      choice === 'ours' ? segment.ours
-      : choice === 'theirs' ? segment.theirs
-      : [...segment.ours, ...segment.theirs];
-    return (
-      <div className="my-1 rounded-md border border-green-800 overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-1 bg-green-900/40 text-xs">
-          <span className="text-green-300">
-            ✓ Conflicto {index + 1} resuelto — conservaste {CHOICE_LABEL[choice]}
-          </span>
-          <button
-            onClick={() => onChoose(null)}
-            className="text-gray-400 hover:text-white underline decoration-dotted"
-          >
-            ↩ cambiar
-          </button>
-        </div>
-        <Lines lines={lines} tone="resolved" />
-      </div>
-    );
-  }
-
+// Fila de acciones tipo CodeLens de VSCode, encima de cada conflicto.
+function LensAction({ onClick, children, className = 'text-blue-400 hover:text-blue-300' }) {
   return (
-    <div className="my-1 rounded-md border border-orange-700 overflow-hidden">
-      <div className="px-3 py-1 bg-orange-900/40 text-xs text-orange-200 font-semibold">
-        ⚡ Conflicto {index + 1} de {total} — elige qué conservar
-      </div>
-
-      {/* Lado "ours" */}
-      <div className="flex items-center justify-between px-3 py-1 bg-green-900/30 border-t border-green-900">
-        <span className="text-[11px] font-mono text-green-400 truncate">
-          {'<'.repeat(7)} {segment.oursLabel}
-          <span className="font-sans text-green-200 ml-2">· {sides.ours}</span>
-        </span>
-        <button
-          onClick={() => onChoose('ours')}
-          className="text-[11px] flex-shrink-0 ml-2 px-2 py-0.5 rounded border border-green-700 text-green-300 hover:bg-green-900/60"
-        >
-          Conservar solo esto
-        </button>
-      </div>
-      <Lines lines={segment.ours} tone="ours" />
-
-      <div className="px-3 text-[11px] font-mono text-gray-500 bg-gray-900 border-y border-gray-800">
-        =======
-      </div>
-
-      {/* Lado "theirs" */}
-      <Lines lines={segment.theirs} tone="theirs" />
-      <div className="flex items-center justify-between px-3 py-1 bg-blue-900/30 border-t border-blue-900">
-        <span className="text-[11px] font-mono text-blue-400 truncate">
-          {'>'.repeat(7)} {segment.theirsLabel}
-          <span className="font-sans text-blue-200 ml-2">· {sides.theirs}</span>
-        </span>
-        <button
-          onClick={() => onChoose('theirs')}
-          className="text-[11px] flex-shrink-0 ml-2 px-2 py-0.5 rounded border border-blue-700 text-blue-300 hover:bg-blue-900/60"
-        >
-          Conservar solo esto
-        </button>
-      </div>
-
-      <div className="px-3 py-1.5 bg-gray-900 border-t border-gray-800 flex justify-center">
-        <button
-          onClick={() => onChoose('both')}
-          className="text-[11px] px-3 py-1 rounded border border-purple-700 text-purple-300 hover:bg-purple-900/50"
-        >
-          ✓✓ Conservar ambos (primero uno, después el otro)
-        </button>
-      </div>
-    </div>
+    <button onClick={onClick} className={`hover:underline ${className}`}>
+      {children}
+    </button>
   );
 }
 
@@ -116,6 +56,10 @@ export default function ConflictResolver({ content, sides, onApply, onEditManual
   const resolvedCount = Object.values(choices).filter(Boolean).length;
   const allResolved = resolvedCount === conflictCount;
 
+  function choose(k, c) {
+    setChoices((prev) => ({ ...prev, [k]: c }));
+  }
+
   function apply(markResolved) {
     const ordered = [];
     let k = 0;
@@ -125,24 +69,80 @@ export default function ConflictResolver({ content, sides, onApply, onEditManual
     onApply(buildResolvedContent(segments, ordered), markResolved);
   }
 
-  let conflictIdx = -1;
+  // Aplana los segmentos en filas renderizables: código numerado y filas
+  // de acciones (sin número), reflejando el estado actual de cada conflicto.
+  const rows = [];
+  let k = -1;
+  for (const seg of segments) {
+    if (seg.type === 'text') {
+      for (const text of seg.lines) rows.push({ kind: 'code', text, tone: 'context' });
+      continue;
+    }
+    k++;
+    const choice = choices[k];
+    if (choice) {
+      rows.push({ kind: 'lens-resolved', k, choice });
+      const lines =
+        choice === 'ours' ? seg.ours
+        : choice === 'theirs' ? seg.theirs
+        : [...seg.ours, ...seg.theirs];
+      if (lines.length === 0) rows.push({ kind: 'empty-note' });
+      for (const text of lines) rows.push({ kind: 'code', text, tone: 'resolved' });
+    } else {
+      rows.push({ kind: 'lens', k });
+      rows.push({ kind: 'code', text: `<<<<<<< ${seg.oursLabel}`, tone: 'oursMarker', note: `Cambio actual · ${sides.ours}` });
+      for (const text of seg.ours) rows.push({ kind: 'code', text, tone: 'ours' });
+      rows.push({ kind: 'code', text: '=======', tone: 'sep' });
+      for (const text of seg.theirs) rows.push({ kind: 'code', text, tone: 'theirs' });
+      rows.push({ kind: 'code', text: `>>>>>>> ${seg.theirsLabel}`, tone: 'theirsMarker', note: `Cambio entrante · ${sides.theirs}` });
+    }
+  }
+
+  let lineNo = 0;
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto bg-gray-950 py-2 text-sm font-mono">
-        {segments.map((seg, i) => {
-          if (seg.type === 'text') return <Lines key={i} lines={seg.lines} tone="context" />;
-          conflictIdx++;
-          const k = conflictIdx;
+      <div className="flex-1 overflow-auto bg-gray-950 py-2 text-sm font-mono leading-relaxed">
+        {rows.map((row, i) => {
+          if (row.kind === 'code') {
+            lineNo++;
+            return <CodeLine key={i} lineNo={lineNo} text={row.text} tone={row.tone} note={row.note} />;
+          }
+          if (row.kind === 'lens') {
+            return (
+              <div key={i} className="flex select-none">
+                <span className="w-12 flex-shrink-0" />
+                <div className="text-[11px] font-sans py-0.5 flex items-center gap-2 text-gray-500">
+                  <LensAction onClick={() => choose(row.k, 'ours')}>Aceptar el cambio actual</LensAction>
+                  <span>|</span>
+                  <LensAction onClick={() => choose(row.k, 'theirs')}>Aceptar el cambio entrante</LensAction>
+                  <span>|</span>
+                  <LensAction onClick={() => choose(row.k, 'both')}>Aceptar ambos cambios</LensAction>
+                </div>
+              </div>
+            );
+          }
+          if (row.kind === 'lens-resolved') {
+            return (
+              <div key={i} className="flex select-none">
+                <span className="w-12 flex-shrink-0" />
+                <div className="text-[11px] font-sans py-0.5 flex items-center gap-2">
+                  <span className="text-green-400">
+                    ✓ Conflicto {row.k + 1} resuelto: aceptaste {CHOICE_LABEL[row.choice]}
+                  </span>
+                  <span className="text-gray-600">|</span>
+                  <LensAction onClick={() => choose(row.k, null)} className="text-gray-400 hover:text-white">
+                    Deshacer
+                  </LensAction>
+                </div>
+              </div>
+            );
+          }
+          // empty-note: la elección deja la zona sin líneas
           return (
-            <ConflictBlock
-              key={i}
-              index={k}
-              total={conflictCount}
-              segment={seg}
-              sides={sides}
-              choice={choices[k]}
-              onChoose={(c) => setChoices((prev) => ({ ...prev, [k]: c }))}
-            />
+            <div key={i} className="flex select-none">
+              <span className="w-12 flex-shrink-0" />
+              <span className="italic text-xs text-gray-600 py-0.5">(se eliminaron las líneas)</span>
+            </div>
           );
         })}
       </div>

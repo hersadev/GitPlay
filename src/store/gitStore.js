@@ -108,7 +108,14 @@ export const useGitStore = create((set, get) => ({
     const handler = COMMANDS[parsed.command];
     let result;
     if (handler) {
-      result = handler(engine, parsed.args);
+      // Si el engine lanza una excepción, mostrarla como error en el terminal
+      // en vez de tragarla en silencio (el comando parecería no hacer nada).
+      try {
+        result = handler(engine, parsed.args);
+      } catch (err) {
+        console.error(`GitPlay: error interno ejecutando 'git ${parsed.command}'`, err);
+        result = { ok: false, output: `error interno del simulador ejecutando 'git ${parsed.command}'.` };
+      }
       // Registrar el comando en la libreta de repaso (solo si funcionó).
       if (result.ok) {
         const used = { ...get().usedCommands };

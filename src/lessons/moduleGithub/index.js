@@ -153,7 +153,7 @@ export const moduleGithub = [
     description:
       'Aplica todo el ciclo end-to-end. Tu compañero añadió `feature-flags.js` a main mientras tú implementabas algo en una rama. Tu objetivo: ramificar, commitear, pushear, abrir PR, mergearlo y dejar tu local sincronizado.',
     objectives: [
-      { label: 'Tienes una rama feature/dark-toggle con commit', validate: (s) => hasBranch('feature/dark-toggle')(s) && s.branches.get('feature/dark-toggle') },
+      { label: 'Tienes una rama feature/dark-toggle con tu commit (darkToggle.js)', validate: fileOnBranch('darkToggle.js', 'feature/dark-toggle') },
       { label: 'feature/dark-toggle está en origin', validate: branchOnRemote('feature/dark-toggle') },
       { label: 'Existe un PR mergeado de feature/dark-toggle → main', validate: hasMergedPR('feature/dark-toggle', 'main') },
       { label: 'main local sincronizado con origin/main', validate: branchSynced('main') },

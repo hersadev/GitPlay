@@ -16,7 +16,8 @@ export class GitEngine {
     // staging y workingDirectory ahora guardan { content } por archivo.
     this.stagingArea = new Map();         // filename -> content
     this.workingDirectory = new Map();    // filename -> content
-    this.stash = [];
+    // Pila del stash. OJO: no llamarla `this.stash` — taparía el método stash().
+    this.stashEntries = [];
     this.reflogHistory = [];
     this.lastCommand = null;
     // Estado de merge en curso (cuando hay conflictos por resolver).
@@ -42,7 +43,7 @@ export class GitEngine {
       HEAD: this.HEAD,
       stagingArea: new Map(this.stagingArea),
       workingDirectory: new Map(this.workingDirectory),
-      stash: [...this.stash],
+      stash: [...this.stashEntries],
       reflog: [...this.reflogHistory],
       lastCommand: this.lastCommand,
       mergeState: this.mergeState
@@ -76,7 +77,7 @@ export class GitEngine {
     this.HEAD = data.HEAD;
     this.stagingArea = data.stagingArea instanceof Map ? data.stagingArea : new Map();
     this.workingDirectory = data.workingDirectory instanceof Map ? data.workingDirectory : new Map();
-    this.stash = data.stash;
+    this.stashEntries = data.stash ?? [];
     this.reflogHistory = data.reflogHistory;
     this.lastCommand = data.lastCommand;
     this.mergeState = data.mergeState ?? null;
@@ -864,7 +865,7 @@ export class GitEngine {
       if (this.stagingArea.size === 0 && this.workingDirectory.size === 0) {
         return { ok: false, output: 'No hay cambios locales para guardar en el stash.' };
       }
-      this.stash.unshift({
+      this.stashEntries.unshift({
         stagingArea: new Map(this.stagingArea),
         workingDirectory: new Map(this.workingDirectory),
         message: `WIP on ${this.HEAD}: ${this._currentCommitHash() ?? 'empty'}`,
@@ -874,19 +875,19 @@ export class GitEngine {
       return { ok: true, output: `Guardado el estado de trabajo en stash@{0}` };
     }
     if (sub === 'pop') {
-      if (!this.stash.length) return { ok: false, output: 'No hay entradas en el stash.' };
-      const entry = this.stash.shift();
+      if (!this.stashEntries.length) return { ok: false, output: 'No hay entradas en el stash.' };
+      const entry = this.stashEntries.shift();
       entry.stagingArea.forEach((v, k) => this.stagingArea.set(k, v));
       entry.workingDirectory.forEach((v, k) => this.workingDirectory.set(k, v));
       return { ok: true, output: 'Cambios restaurados del stash.' };
     }
     if (sub === 'list') {
-      if (!this.stash.length) return { ok: true, output: '(stash vacío)' };
-      return { ok: true, output: this.stash.map((e, i) => `stash@{${i}}: ${e.message}`).join('\n') };
+      if (!this.stashEntries.length) return { ok: true, output: '(stash vacío)' };
+      return { ok: true, output: this.stashEntries.map((e, i) => `stash@{${i}}: ${e.message}`).join('\n') };
     }
     if (sub === 'drop') {
-      if (!this.stash.length) return { ok: false, output: 'No hay entradas en el stash.' };
-      this.stash.shift();
+      if (!this.stashEntries.length) return { ok: false, output: 'No hay entradas en el stash.' };
+      this.stashEntries.shift();
       return { ok: true, output: 'Eliminada stash@{0}' };
     }
     return { ok: false, output: `error: subcomando desconocido '${sub}'` };

@@ -18,7 +18,8 @@ function resolveContent(file, repo) {
     return { content: c, label: 'staging' };
   }
   if (source === 'commit' && hash) {
-    const commit = repo.commits?.get?.(hash);
+    // El commit puede ser local o solo del remoto (vista GitHub antes del pull).
+    const commit = repo.commits?.get?.(hash) ?? repo.remoteCommits?.get?.(hash);
     const c = commit?.tree?.get?.(name);
     if (c === undefined) return { content: '', label: `commit ${hash}`, missing: true };
     return { content: c, label: `commit ${hash}` };
