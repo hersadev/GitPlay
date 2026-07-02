@@ -103,48 +103,55 @@ export const BADGES = [
     check: ({ repoState }) =>
       [...repoState.reflog].some((e) => /Merge resuelto/.test(e.message ?? '')),
   },
-  // Hitos por módulo (orden nuevo)
+  // Hitos por módulo. El umbral es el nº ACUMULADO de lecciones hasta terminar
+  // ese módulo (orden pedagógico), porque al completar la última lección de un
+  // módulo `lessonIndex` avanza a ese valor. Si cambias cuántas lecciones tiene
+  // un módulo, actualiza estos umbrales.
+  // Acumulados actuales: 7 (m1) · 15 (ramas) · 22 (github) · 30 (historia) · 36 (equipo) · 41 (total)
   {
     id: 'module-1',
     name: 'Módulo 1 completado',
-    description: 'Termina "Arrancar TaskFlow" (6 lecciones).',
+    description: 'Termina "Arrancar TaskFlow" (7 lecciones).',
     icon: '1️⃣',
-    check: ({ lessonIndex }) => lessonIndex >= 6,
+    check: ({ lessonIndex }) => lessonIndex >= 7,
   },
   {
     id: 'module-2',
     name: 'Módulo 2 completado',
-    description: 'Termina "Features en ramas" (7 lecciones).',
+    description: 'Termina "Features en ramas" (8 lecciones).',
     icon: '2️⃣',
-    check: ({ lessonIndex }) => lessonIndex >= 13,
+    check: ({ lessonIndex }) => lessonIndex >= 15,
   },
   {
     id: 'module-3',
     name: 'Módulo 3 completado',
     description: 'Termina "Trabajar con GitHub" (7 lecciones).',
     icon: '3️⃣',
-    check: ({ lessonIndex }) => lessonIndex >= 20,
+    check: ({ lessonIndex }) => lessonIndex >= 22,
   },
   {
     id: 'module-4',
     name: 'Módulo 4 completado',
     description: 'Termina "Reescribir historia y releases" (8 lecciones).',
     icon: '4️⃣',
-    check: ({ lessonIndex }) => lessonIndex >= 28,
+    check: ({ lessonIndex }) => lessonIndex >= 30,
   },
   {
     id: 'module-5',
     name: 'Módulo 5 completado',
     description: 'Termina "Trabajo en equipo avanzado" (6 lecciones).',
     icon: '5️⃣',
-    check: ({ lessonIndex }) => lessonIndex >= 34,
+    check: ({ lessonIndex }) => lessonIndex >= 36,
   },
   {
     id: 'graduate',
     name: 'Graduado',
-    description: 'Completa las 39 lecciones de GitPlay.',
+    description: 'Completa las 41 lecciones de GitPlay.',
     icon: '🎓',
-    check: ({ lessonIndex, totalLessons }) => lessonIndex >= totalLessons,
+    // La app no avanza más allá de la última lección, así que lessonIndex tope
+    // es totalLessons-1: se desbloquea al completar (isComplete) esa última.
+    check: ({ lessonIndex, totalLessons, isComplete }) =>
+      isComplete && lessonIndex >= totalLessons - 1,
   },
 ];
 

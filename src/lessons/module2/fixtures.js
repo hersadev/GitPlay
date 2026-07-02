@@ -73,6 +73,28 @@ function applyTheme(theme) {
 }
 `;
 
+export const SETTINGS_JS = `// Pantalla de ajustes de TaskFlow.
+// Agrupa las preferencias del usuario (idioma, notificaciones, tema).
+
+const KEY = 'taskflow:settings';
+
+export function loadSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(KEY)) ?? defaults();
+  } catch {
+    return defaults();
+  }
+}
+
+export function saveSettings(settings) {
+  localStorage.setItem(KEY, JSON.stringify(settings));
+}
+
+function defaults() {
+  return { language: 'es', notifications: true, theme: 'system' };
+}
+`;
+
 export const CHANGELOG_MD = `# CHANGELOG
 
 Todos los cambios relevantes de TaskFlow se documentan aquí.
