@@ -127,9 +127,10 @@ export const moduleGithub = [
     ],
     hints: [
       'Edita el README.md (pulsa sobre el archivo en el panel derecho → Editar) y haz un commit local',
-      'git pull   (verás "CONFLICTO" en README.md)',
-      'Abre README.md, quita los marcadores <<<<<<<, =======, >>>>>>> y guarda',
-      'git add README.md && git commit   (concluye el merge; el mensaje es opcional)',
+      'git pull   (verás "CONFLICTO" en README.md y se abrirá el resolutor visual)',
+      'Elige con los botones qué conservar (los tuyos, los del compañero o ambos) y pulsa "Guardar y marcar resuelto" — hace el git add por ti',
+      'También puedes hacerlo a mano: quitar los marcadores <<<<<<< ======= >>>>>>> y git add README.md',
+      'git commit   (concluye el merge; el mensaje es opcional)',
       'git push   (sube el merge: main y origin/main vuelven a estar iguales)',
     ],
     setupFiles: { 'README.md': README_BASE },

@@ -44,8 +44,8 @@ export const COMMAND_INFO = {
     desc: 'La forma moderna de cambiar de rama. Con -c crea la rama y se mueve a ella en un solo paso.',
   },
   merge: {
-    usage: 'git merge <rama>',
-    desc: 'Integra los commits de otra rama en la actual. Puede ser fast-forward (mover el puntero) o crear un commit de merge.',
+    usage: 'git merge <rama> · git merge --abort',
+    desc: 'Integra los commits de otra rama en la actual. Puede ser fast-forward (mover el puntero) o crear un commit de merge. Si ambos lados tocan las mismas líneas, se pausa con conflictos: resuélvelos (con el resolutor visual o a mano), haz git add y commitea. Con --abort lo cancelas.',
   },
   restore: {
     usage: 'git restore <archivo> · git restore --staged <archivo>',
@@ -72,8 +72,8 @@ export const COMMAND_INFO = {
     desc: 'Copia un commit concreto de otra rama y lo aplica sobre la actual. Ideal para portar un fix sin traer toda la rama.',
   },
   rebase: {
-    usage: 'git rebase <rama>',
-    desc: 'Reaplica tus commits encima de otra rama, dejando la historia lineal. Reescribe los hashes: no usarlo en commits ya compartidos.',
+    usage: 'git rebase <rama> · git rebase --continue · git rebase --abort',
+    desc: 'Reaplica tus commits encima de otra rama, dejando la historia lineal. Si hay conflictos se pausa: resuélvelos, haz git add y sigue con --continue (o cancela con --abort). Reescribe los hashes: no usarlo en commits ya compartidos.',
   },
   reflog: {
     usage: 'git reflog',
@@ -85,7 +85,7 @@ export const COMMAND_INFO = {
   },
   pull: {
     usage: 'git pull',
-    desc: 'Trae los commits nuevos del remoto y los integra en tu rama actual. Equivale a git fetch + git merge.',
+    desc: 'Trae los commits nuevos del remoto y los integra en tu rama actual. Equivale a git fetch + git merge — y como todo merge, puede generar conflictos si tú y el remoto tocasteis las mismas líneas.',
   },
   fetch: {
     usage: 'git fetch',

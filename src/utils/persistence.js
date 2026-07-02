@@ -2,6 +2,7 @@ const REPO_KEY = 'gitplay:repo';
 const LESSON_KEY = 'gitplay:lesson';
 const LESSON_MAX_KEY = 'gitplay:lessonMax';
 const COMMANDS_KEY = 'gitplay:commands';
+const WELCOME_KEY = 'gitplay:welcomed';
 const LEGACY_REPO_KEY = 'gitlern:repo';
 const LEGACY_LESSON_KEY = 'gitlern:lesson';
 
@@ -32,6 +33,9 @@ export function saveRepo(engine) {
       lastCommand: engine.lastCommand,
       mergeState: engine.mergeState
         ? { ...engine.mergeState, conflicts: [...engine.mergeState.conflicts] }
+        : null,
+      rebaseState: engine.rebaseState
+        ? { ...engine.rebaseState, conflicts: [...engine.rebaseState.conflicts] }
         : null,
       remoteBranches: [...engine.remoteBranches.entries()],
       remoteCommits: [...engine.remoteCommits.entries()].map(([h, c]) => [h, {
@@ -83,6 +87,14 @@ export function loadRepo() {
       lastCommand: d.lastCommand ?? null,
       mergeState: d.mergeState
         ? { ...d.mergeState, conflicts: new Set(d.mergeState.conflicts ?? []) }
+        : null,
+      rebaseState: d.rebaseState
+        ? {
+            ...d.rebaseState,
+            todo: d.rebaseState.todo ?? [],
+            created: d.rebaseState.created ?? [],
+            conflicts: new Set(d.rebaseState.conflicts ?? []),
+          }
         : null,
       remoteBranches: new Map(d.remoteBranches ?? []),
       remoteCommits: new Map((d.remoteCommits ?? []).map(([h, c]) => [h, {
@@ -148,9 +160,19 @@ export function clearProgress() {
     localStorage.removeItem(LESSON_KEY);
     localStorage.removeItem(LESSON_MAX_KEY);
     localStorage.removeItem(COMMANDS_KEY);
+    localStorage.removeItem(WELCOME_KEY);
     localStorage.removeItem(LEGACY_REPO_KEY);
     localStorage.removeItem(LEGACY_LESSON_KEY);
   } catch (_) {}
+}
+
+// Modal de bienvenida: se muestra a usuarios nuevos y tras reiniciar el juego.
+export function loadWelcomeSeen() {
+  try { return localStorage.getItem(WELCOME_KEY) === '1'; } catch (_) { return true; }
+}
+
+export function saveWelcomeSeen() {
+  try { localStorage.setItem(WELCOME_KEY, '1'); } catch (_) {}
 }
 
 const BADGES_KEY = 'gitplay:badges';

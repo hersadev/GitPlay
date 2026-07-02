@@ -98,12 +98,31 @@ export const BADGES = [
     check: ({ repoState }) => (repoState.pullRequests ?? []).some((p) => p.state === 'merged'),
   },
   {
+    id: 'conflict-survivor',
+    name: '¡Houston, tenemos un conflicto!',
+    description: 'Encuéntrate tu primer conflicto (merge, pull o rebase). Que no cunda el pánico.',
+    icon: '💥',
+    check: ({ repoState }) =>
+      (repoState.mergeState?.conflicts?.size ?? 0) > 0 ||
+      (repoState.rebaseState?.conflicts?.size ?? 0) > 0,
+  },
+  {
     id: 'conflict-resolver',
     name: 'Pacificador',
     description: 'Resuelve un conflicto de merge.',
     icon: '🕊️',
     check: ({ repoState }) =>
       [...repoState.reflog].some((e) => /Merge resuelto/.test(e.message ?? '')),
+  },
+  {
+    id: 'rebase-surgeon',
+    name: 'Cirujano del rebase',
+    description: 'Completa un rebase resolviendo sus conflictos (git rebase --continue).',
+    icon: '🩹',
+    check: ({ repoState }) =>
+      [...repoState.reflog].some((e) =>
+        /rebase finished.*conflictos resueltos/.test(e.message ?? '')
+      ),
   },
   // Hitos por módulo: el umbral es el nº acumulado de lecciones hasta terminar
   // ese módulo, calculado desde MODULES (se ajusta solo al añadir lecciones).

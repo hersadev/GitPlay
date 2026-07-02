@@ -1,5 +1,6 @@
 import { generateHash, resetHashCounter, markHashesUsed } from '../utils/hashGenerator.js';
 import { parseIgnoreRules, matchesIgnore } from '../utils/ignore.js';
+import { hasConflictMarkers } from '../utils/conflicts.js';
 
 export class GitEngine {
   constructor() {
@@ -21,6 +22,9 @@ export class GitEngine {
     // Estado de merge en curso (cuando hay conflictos por resolver).
     // { fromBranch, fromHash, conflicts: Set<filename> } | null
     this.mergeState = null;
+    // Estado de rebase en curso (pausado en un conflicto).
+    // { branch, target, originalTip, newParent, todo: [hash], created: [hash], conflicts: Set<filename> } | null
+    this.rebaseState = null;
     // Remoto simulado "origin".
     this.remoteBranches = new Map();      // branchName -> hash (estado real del remoto)
     this.remoteCommits = new Map();       // hash -> commit (todos los commits del remoto)
@@ -43,6 +47,14 @@ export class GitEngine {
       lastCommand: this.lastCommand,
       mergeState: this.mergeState
         ? { ...this.mergeState, conflicts: new Set(this.mergeState.conflicts) }
+        : null,
+      rebaseState: this.rebaseState
+        ? {
+            ...this.rebaseState,
+            todo: [...this.rebaseState.todo],
+            created: [...this.rebaseState.created],
+            conflicts: new Set(this.rebaseState.conflicts),
+          }
         : null,
       remoteBranches: new Map(this.remoteBranches),
       remoteCommits: new Map(this.remoteCommits),
@@ -68,6 +80,7 @@ export class GitEngine {
     this.reflogHistory = data.reflogHistory;
     this.lastCommand = data.lastCommand;
     this.mergeState = data.mergeState ?? null;
+    this.rebaseState = data.rebaseState ?? null;
     this.remoteBranches = data.remoteBranches instanceof Map ? data.remoteBranches : new Map();
     this.remoteCommits = data.remoteCommits instanceof Map ? data.remoteCommits : new Map();
     this.remoteRefs = data.remoteRefs instanceof Map ? data.remoteRefs : new Map();
@@ -136,6 +149,38 @@ export class GitEngine {
     // NO actualizamos remoteRefs: el cliente todavía no lo sabe hasta que haga fetch.
   }
 
+  // Crea un commit directamente sobre una rama LOCAL (setup de lecciones:
+  // simular trabajo previo tuyo o de un compañero). No toca HEAD, staging
+  // ni working directory. Idempotente: si el tip ya tiene ese mensaje, no hace nada.
+  seedLocalCommit(branch, { message, files, author = 'compañero' }) {
+    if (!this.initialized || !this.branches.has(branch)) return;
+    const parentHash = this.branches.get(branch);
+    if (parentHash && this.commits.get(parentHash)?.message === message) return;
+    const parentTree = parentHash ? this._treeOf(parentHash) : new Map();
+    const newTree = new Map(parentTree);
+    const changedFiles = [];
+    for (const [name, content] of Object.entries(files)) {
+      newTree.set(name, content);
+      changedFiles.push(name);
+    }
+    const hash = generateHash();
+    this.commits.set(hash, {
+      hash, message,
+      parent: parentHash, secondParent: null,
+      timestamp: Date.now(), author,
+      files: changedFiles, tree: newTree,
+    });
+    this.branches.set(branch, hash);
+  }
+
+  // Crea una rama local apuntando al tip de otra (setup de lecciones, idempotente).
+  seedBranch(name, from = 'main') {
+    if (!this.initialized || this.branches.has(name)) return;
+    const hash = this.branches.get(from);
+    if (!hash) return;
+    this.branches.set(name, hash);
+  }
+
   // ── Comandos básicos ──────────────────────────────────────────────────
 
   init() {
@@ -161,9 +206,10 @@ export class GitEngine {
         this.workingDirectory.delete(f);
       });
       // Conflictos resueltos dejando la versión de HEAD tal cual: marcarlos también.
-      if (this.mergeState) {
+      const dotConflicts = this.mergeState?.conflicts ?? this.rebaseState?.conflicts;
+      if (dotConflicts) {
         const tree = this._currentTree();
-        for (const f of this.mergeState.conflicts) {
+        for (const f of dotConflicts) {
           if (!this.stagingArea.has(f)) this.stagingArea.set(f, tree.get(f) ?? '');
         }
       }
@@ -198,11 +244,12 @@ export class GitEngine {
     }
 
     // git add <a> <b> <c>  → procesa cada uno.
+    const conflictSet = this.mergeState?.conflicts ?? this.rebaseState?.conflicts;
     for (const target of args) {
       if (this.workingDirectory.has(target)) {
         this.stagingArea.set(target, this.workingDirectory.get(target));
         this.workingDirectory.delete(target);
-      } else if (this.mergeState?.conflicts?.has(target) && !this.stagingArea.has(target)) {
+      } else if (conflictSet?.has(target) && !this.stagingArea.has(target)) {
         // Conflicto resuelto dejando la versión de HEAD: marcarlo como resuelto.
         this.stagingArea.set(target, tree.get(target) ?? '');
       }
@@ -226,6 +273,12 @@ export class GitEngine {
 
   commit(args) {
     if (!this.initialized) return this._notInit();
+    if (this.rebaseState) {
+      return {
+        ok: false,
+        output: 'Estás en medio de un rebase, no de un merge.\nResuelve los conflictos, haz `git add`, y continúa con `git rebase --continue` (o cancela con `git rebase --abort`).',
+      };
+    }
     if (args.includes('--amend')) return this._commitAmend(args);
     const mIdx = args.indexOf('-m');
     // Al concluir un merge se permite `git commit` sin -m: Git usa el mensaje por defecto.
@@ -361,6 +414,21 @@ export class GitEngine {
       }
     }
 
+    if (this.rebaseState) {
+      const current = this.commits.get(this.rebaseState.todo[0]);
+      lines.push(`\nRebase en curso: reaplicando "${current?.message ?? '?'}" sobre ${this.rebaseState.target}.`);
+      const unresolved = [...this.rebaseState.conflicts].filter(
+        (f) => !this.stagingArea.has(f) || hasConflictMarkers(this.stagingArea.get(f))
+      );
+      if (unresolved.length) {
+        lines.push('\nRutas no fusionadas:');
+        lines.push('  (edita los archivos, resuelve los conflictos y haz `git add`)');
+        unresolved.forEach((f) => lines.push(`  ambos modificados:   ${f}`));
+      } else {
+        lines.push('\nTodos los conflictos resueltos. Ejecuta `git rebase --continue`.');
+      }
+    }
+
     const tree = this._currentTree();
 
     if (this.stagingArea.size > 0) {
@@ -390,6 +458,7 @@ export class GitEngine {
     }
     if (
       !this.mergeState &&
+      !this.rebaseState &&
       this.stagingArea.size === 0 &&
       modified.length === 0 &&
       untracked.length === 0
@@ -532,6 +601,9 @@ export class GitEngine {
     if (!this.initialized) return this._notInit();
     if (args[0] === '--abort') return this._mergeAbort();
     if (!args.length) return { ok: false, output: 'Uso: git merge <rama>' };
+    if (this.rebaseState) {
+      return { ok: false, output: 'Hay un rebase en curso.\nTermínalo con `git rebase --continue` o cancélalo con `git rebase --abort`.' };
+    }
     if (this.mergeState) {
       return { ok: false, output: 'Ya hay un merge en curso.\nResuelve los conflictos y commitea, o usa `git merge --abort`.' };
     }
@@ -645,6 +717,9 @@ export class GitEngine {
 
   gitReset(args) {
     if (!this.initialized) return this._notInit();
+    if (this.rebaseState) {
+      return { ok: false, output: 'Hay un rebase en curso.\nUsa `git rebase --continue` para terminarlo o `git rebase --abort` para cancelarlo.' };
+    }
 
     let mode = '--mixed';
     let rest = [...args];
@@ -742,6 +817,9 @@ export class GitEngine {
 
   revert(args) {
     if (!this.initialized) return this._notInit();
+    if (this.rebaseState) {
+      return { ok: false, output: 'Hay un rebase en curso.\nTermínalo con `git rebase --continue` o cancélalo con `git rebase --abort`.' };
+    }
     if (!args.length) return { ok: false, output: 'Uso: git revert <hash>' };
     this._setLast('revert', args);
 
@@ -837,6 +915,9 @@ export class GitEngine {
 
   cherryPick(args) {
     if (!this.initialized) return this._notInit();
+    if (this.rebaseState) {
+      return { ok: false, output: 'Hay un rebase en curso.\nTermínalo con `git rebase --continue` o cancélalo con `git rebase --abort`.' };
+    }
     if (!args.length) return { ok: false, output: 'Uso: git cherry-pick <hash>' };
     this._setLast('cherry-pick', args);
 
@@ -869,13 +950,32 @@ export class GitEngine {
 
   rebase(args) {
     if (!this.initialized) return this._notInit();
-    if (!args.length) return { ok: false, output: 'Uso: git rebase <rama>' };
+    if (args[0] === '--continue') return this._rebaseContinue();
+    if (args[0] === '--abort') return this._rebaseAbort();
+    if (!args.length) return { ok: false, output: 'Uso: git rebase <rama>\n       git rebase --continue | --abort' };
+    if (this.rebaseState) {
+      return { ok: false, output: 'Ya hay un rebase en curso.\nResuelve los conflictos y usa `git rebase --continue`, o cancela con `git rebase --abort`.' };
+    }
+    if (this.mergeState) {
+      return { ok: false, output: 'Hay un merge en curso.\nTermínalo (o `git merge --abort`) antes de rebasear.' };
+    }
     this._setLast('rebase', args);
 
     const target = args[0];
     const targetHash = this.branches.get(target) ?? this._resolveRef(target);
     if (!targetHash) return { ok: false, output: `error: la rama '${target}' no existe.` };
     if (target === this.HEAD) return { ok: false, output: 'No puedes hacer rebase sobre tu propia rama.' };
+    if (this._isDetached()) return { ok: false, output: 'No puedes rebasear con HEAD desacoplado. Vuelve a una rama primero.' };
+
+    // Como en git real: exige un árbol limpio antes de rebasear.
+    const tree = this._currentTree();
+    const dirtyTracked = [...this.workingDirectory.keys()].filter((f) => tree.has(f));
+    if (this.stagingArea.size > 0 || dirtyTracked.length > 0) {
+      return {
+        ok: false,
+        output: 'error: tienes cambios sin commitear.\nHaz commit o guárdalos con `git stash` antes de rebasear.',
+      };
+    }
 
     const currentHash = this._currentCommitHash();
     const ancestor = this._findCommonAncestor(currentHash, targetHash);
@@ -885,33 +985,154 @@ export class GitEngine {
     while (h && h !== ancestor) {
       const c = this.commits.get(h);
       if (!c) break;
-      toReapply.unshift(c);
+      toReapply.unshift(c.hash);
       h = c.parent;
     }
 
     if (!toReapply.length) return { ok: true, output: 'Ya está actualizado.' };
 
-    let newParent = targetHash;
-    for (const c of toReapply) {
-      const newHash = generateHash();
-      const parentTree = this._treeOf(newParent);
+    this.rebaseState = {
+      branch: this.HEAD,
+      target,
+      originalTip: currentHash,
+      newParent: targetHash,
+      todo: toReapply,
+      created: [],
+      conflicts: new Set(),
+      hadConflicts: false, // para distinguir en el reflog un rebase con conflictos resueltos
+    };
+    return this._rebaseStep();
+  }
+
+  // Reaplica commits pendientes hasta terminar o toparse con un conflicto.
+  _rebaseStep() {
+    const rs = this.rebaseState;
+    while (rs.todo.length) {
+      const c = this.commits.get(rs.todo[0]);
+      const parentTree = this._treeOf(rs.newParent);
+      const baseTree = c.parent ? this._treeOf(c.parent) : new Map();
       const newTree = new Map(parentTree);
-      for (const name of c.files) {
-        if (c.tree?.has(name)) newTree.set(name, c.tree.get(name));
+      const conflicts = new Set();
+
+      for (const f of c.files) {
+        const theirs = c.tree?.get(f);       // lo que trae tu commit
+        if (theirs === undefined) continue;
+        const ours = parentTree.get(f);      // lo que ya hay en la nueva base
+        const base = baseTree.get(f);
+        if (ours === theirs) continue;                        // idéntico en ambos lados
+        if (ours === undefined || ours === base) {            // solo cambió tu commit
+          newTree.set(f, theirs);
+          continue;
+        }
+        conflicts.add(f);                                     // ambos divergen → conflicto
       }
+
+      if (conflicts.size > 0) {
+        rs.conflicts = conflicts;
+        rs.hadConflicts = true;
+        // Los archivos sin conflicto del commit quedan preparados (staging),
+        // como hace git real: se incluirán al hacer --continue.
+        for (const f of c.files) {
+          if (conflicts.has(f)) continue;
+          const content = newTree.get(f);
+          if (content !== undefined && parentTree.get(f) !== content) {
+            this.stagingArea.set(f, content);
+          }
+        }
+        for (const f of conflicts) {
+          // Ojo con la semántica de rebase: "ours" (HEAD) es la nueva base
+          // (p.ej. main con el trabajo del compañero) y "theirs" es TU commit reaplicado.
+          const marked = buildConflictMarkers(
+            parentTree.get(f) ?? '',
+            c.tree?.get(f) ?? '',
+            'HEAD',
+            `${c.hash} (${c.message})`
+          );
+          this.workingDirectory.set(f, marked);
+        }
+        const list = [...conflicts].map((f) => `  CONFLICTO (contenido): merge conflict en ${f}`).join('\n');
+        return {
+          ok: false,
+          output: `Reaplicando: ${c.message}\n${list}\nResuelve los conflictos, haz \`git add\`, y sigue con \`git rebase --continue\`.\nO cancela con \`git rebase --abort\`.`,
+        };
+      }
+
+      // Sin conflictos: crear el commit reaplicado y avanzar.
+      const newHash = generateHash();
       this.commits.set(newHash, {
         hash: newHash, message: c.message,
-        parent: newParent, secondParent: null,
+        parent: rs.newParent, secondParent: null,
         timestamp: Date.now(), author: c.author,
         files: [...c.files],
         tree: newTree,
       });
-      newParent = newHash;
+      rs.created.push(newHash);
+      rs.newParent = newHash;
+      rs.todo.shift();
     }
 
-    this.branches.set(this.HEAD, newParent);
-    this._addReflog(this.HEAD, newParent, `rebase finished: HEAD is now at ${newParent}`);
-    return { ok: true, output: `Se han reaplicado ${toReapply.length} commit(s) sobre ${target}.\nHEAD apunta a ${newParent}.` };
+    // Todos reaplicados: mover la rama y cerrar el rebase.
+    const tip = rs.newParent;
+    const total = rs.created.length;
+    const target = rs.target;
+    const suffix = rs.hadConflicts ? ' (conflictos resueltos)' : '';
+    this.branches.set(rs.branch, tip);
+    this.rebaseState = null;
+    this._addReflog(this.HEAD, tip, `rebase finished: HEAD is now at ${tip}${suffix}`);
+    return { ok: true, output: `Se han reaplicado ${total} commit(s) sobre ${target}.\nHEAD apunta a ${tip}.` };
+  }
+
+  _rebaseContinue() {
+    const rs = this.rebaseState;
+    if (!rs) return { ok: false, output: 'No hay ningún rebase en curso.' };
+    this._setLast('rebase', ['--continue']);
+
+    const unresolved = [...rs.conflicts].filter(
+      (f) => !this.stagingArea.has(f) || hasConflictMarkers(this.stagingArea.get(f))
+    );
+    if (unresolved.length > 0) {
+      return {
+        ok: false,
+        output: `Conflictos sin resolver en:\n${unresolved.map((f) => '  ' + f).join('\n')}\nEdita los archivos, quita los marcadores, y haz \`git add\` antes de continuar.`,
+      };
+    }
+
+    // Crear el commit reaplicado con las resoluciones del staging.
+    const c = this.commits.get(rs.todo[0]);
+    const newTree = new Map(this._treeOf(rs.newParent));
+    const changed = new Set();
+    for (const [name, content] of this.stagingArea.entries()) {
+      newTree.set(name, content);
+      changed.add(name);
+    }
+    const newHash = generateHash();
+    this.commits.set(newHash, {
+      hash: newHash, message: c.message,
+      parent: rs.newParent, secondParent: null,
+      timestamp: Date.now(), author: c.author,
+      files: [...changed],
+      tree: newTree,
+    });
+    rs.created.push(newHash);
+    rs.newParent = newHash;
+    rs.todo.shift();
+    rs.conflicts = new Set();
+    this.stagingArea = new Map();
+    return this._rebaseStep();
+  }
+
+  _rebaseAbort() {
+    const rs = this.rebaseState;
+    if (!rs) return { ok: false, output: 'No hay ningún rebase en curso.' };
+    this._setLast('rebase', ['--abort']);
+    // Los commits reaplicados a medias nunca llegaron a la rama: descartarlos.
+    for (const h of rs.created) this.commits.delete(h);
+    // Los archivos en conflicto vuelven a resolverse desde el tip de la rama
+    // (el rebase exigió árbol limpio al empezar).
+    for (const f of rs.conflicts) this.workingDirectory.delete(f);
+    this.stagingArea = new Map();
+    this.rebaseState = null;
+    return { ok: true, output: 'Rebase abortado. Vuelves al estado anterior.' };
   }
 
   reflog() {
@@ -1188,6 +1409,9 @@ export class GitEngine {
   }
 
   _switchTo(target) {
+    if (this.rebaseState) {
+      return { ok: false, output: 'No puedes cambiar de rama en medio de un rebase.\nTermínalo con `git rebase --continue` o cancélalo con `git rebase --abort`.' };
+    }
     const prev = this.HEAD;
     if (this.branches.has(target)) {
       this.HEAD = target;
@@ -1277,18 +1501,28 @@ export class GitEngine {
   }
 }
 
+// Genera los marcadores SOLO alrededor de la zona que difiere (prefijo y sufijo
+// comunes fuera del conflicto), como hace git real hunk a hunk. Así el conflicto
+// es legible y "conservar ambos" tiene sentido.
 function buildConflictMarkers(ours, theirs, ourLabel = 'HEAD', theirLabel = 'theirs') {
-  const lines = [];
-  lines.push(`<<<<<<< ${ourLabel}`);
-  if (ours) lines.push(...ours.split('\n'));
-  lines.push('=======');
-  if (theirs) lines.push(...theirs.split('\n'));
-  lines.push(`>>>>>>> ${theirLabel}`);
-  return lines.join('\n');
-}
+  const a = ours === '' ? [] : ours.split('\n');
+  const b = theirs === '' ? [] : theirs.split('\n');
 
-function hasConflictMarkers(content) {
-  return typeof content === 'string' && /^<<<<<<< /m.test(content) && /^>>>>>>> /m.test(content);
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
+
+  return [
+    ...a.slice(0, start),
+    `<<<<<<< ${ourLabel}`,
+    ...a.slice(start, endA),
+    '=======',
+    ...b.slice(start, endB),
+    `>>>>>>> ${theirLabel}`,
+    ...a.slice(endA),
+  ].join('\n');
 }
 
 // LCS-based line diff. Produce una lista de {type, line} con 'add', 'del', 'ctx'.

@@ -95,3 +95,27 @@ export const hasAnyPR = (s) => (s.pullRequests ?? []).length > 0;
 
 // El estado del repo NO tiene mergeState activo (= conflictos resueltos).
 export const mergeResolved = (s) => !s.mergeState;
+
+// Hay un rebase pausado (normalmente por conflictos).
+export const rebaseInProgress = (s) => !!s.rebaseState;
+
+// El contenido del archivo en el tip de la rama cumple el patrón.
+export const branchFileMatches = (branch, file, regex) => (s) => {
+  const tip = s.branches.get(branch);
+  const content = tip ? s.commits.get(tip)?.tree?.get?.(file) : undefined;
+  return typeof content === 'string' && regex.test(content);
+};
+
+// La rama quedó rebaseada sobre `base`: el tip de base está en la cadena de
+// primeros padres del tip de branch. Un merge NO cumple esto (la otra rama
+// entra por el segundo padre), así que distingue rebase de merge.
+export const rebasedOnto = (branch, base) => (s) => {
+  const baseTip = s.branches.get(base);
+  if (!baseTip) return false;
+  let cur = s.branches.get(branch);
+  while (cur) {
+    if (cur === baseTip) return true;
+    cur = s.commits.get(cur)?.parent ?? null;
+  }
+  return false;
+};

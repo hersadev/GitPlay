@@ -12,6 +12,7 @@ import BadgesPanel from './components/badges/BadgesPanel';
 import BadgeModal from './components/badges/BadgeModal';
 import GitHubView from './components/github/GitHubView';
 import CommandLog from './components/commands/CommandLog';
+import WelcomeModal from './components/onboarding/WelcomeModal';
 import { useGitStore } from './store/gitStore';
 import { useGitEngine } from './hooks/useGitEngine';
 import { useTerminalHistory } from './hooks/useTerminalHistory';
@@ -25,6 +26,8 @@ import {
   saveLessonMax,
   loadLessonMax,
   clearProgress,
+  loadWelcomeSeen,
+  saveWelcomeSeen,
 } from './utils/persistence';
 import { ALL_LESSONS } from './lessons';
 
@@ -54,6 +57,8 @@ export default function App() {
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [openFile, setOpenFile] = useState(null); // { name, source: 'staged' | 'working' | 'commit', hash? }
+  // Bienvenida: solo para usuarios nuevos (o tras reiniciar el juego).
+  const [welcomeOpen, setWelcomeOpen] = useState(() => !loadWelcomeSeen());
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(240);
   const [terminalHeight, setTerminalHeight] = useState(192);
@@ -141,7 +146,16 @@ export default function App() {
       const result = runCommand(part);
       if (result.output) pushOutput(result.output, result.ok ? 'success' : 'error');
       // Como en la shell, && corta la cadena en el primer error.
-      if (!result.ok) return;
+      if (!result.ok) {
+        // Si el comando dejó conflictos pendientes, abrir el resolutor visual
+        // sobre el primer archivo en conflicto.
+        if (/^git (merge|pull|rebase)\b/.test(part)) {
+          const repo = useGitStore.getState().repoState;
+          const conflicts = repo.mergeState?.conflicts ?? repo.rebaseState?.conflicts;
+          if (conflicts?.size) setOpenFile({ name: [...conflicts][0], source: 'working' });
+        }
+        return;
+      }
     }
   }
 
@@ -157,8 +171,14 @@ export default function App() {
     setSelectorOpen(false);
     setBadgesOpen(false);
     setCommandsOpen(false);
+    setWelcomeOpen(true); // empezar de cero: mostrar la bienvenida de nuevo
     // Forzar re-seed: si lessonIndex ya era 0, el useEffect no se redispararía.
     if (ALL_LESSONS[0]?.setupFiles) seedFiles(ALL_LESSONS[0].setupFiles);
+  }
+
+  function handleCloseWelcome() {
+    saveWelcomeSeen();
+    setWelcomeOpen(false);
   }
 
   function handleSelectLesson(index) {
@@ -274,6 +294,8 @@ export default function App() {
         <StatusPanel
           repo={repoState}
           onOpenFile={(name, source) => setOpenFile({ name, source })}
+          onStage={(name) => handleCommand(`git add ${name}`)}
+          onUnstage={(name) => handleCommand(`git restore --staged ${name}`)}
         />
       </div>
 
@@ -284,6 +306,7 @@ export default function App() {
             repo={repoState}
             onClose={() => setOpenFile(null)}
             onSave={(name, content) => editFile(name, content)}
+            onMarkResolved={(name) => handleCommand(`git add ${name}`)}
           />
         )}
       </AnimatePresence>
@@ -324,6 +347,10 @@ export default function App() {
 
       <AnimatePresence>
         {recent && <BadgeModal badge={recent} onClose={dismissRecent} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {welcomeOpen && <WelcomeModal onClose={handleCloseWelcome} />}
       </AnimatePresence>
     </MainLayout>
   );

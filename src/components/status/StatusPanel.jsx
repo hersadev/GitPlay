@@ -15,7 +15,7 @@ function Empty({ text }) {
   return <p className="text-xs text-gray-600 italic">{text}</p>;
 }
 
-export default function StatusPanel({ repo, onOpenFile }) {
+export default function StatusPanel({ repo, onOpenFile, onStage, onUnstage }) {
   const {
     initialized,
     commits = new Map(),
@@ -25,6 +25,7 @@ export default function StatusPanel({ repo, onOpenFile }) {
     stagingArea = new Map(),
     workingDirectory = new Map(),
     mergeState = null,
+    rebaseState = null,
     stash = [],
   } = repo ?? {};
 
@@ -42,6 +43,7 @@ export default function StatusPanel({ repo, onOpenFile }) {
   }
 
   const conflicts = mergeState?.conflicts ? [...mergeState.conflicts] : [];
+  const rebaseConflicts = rebaseState?.conflicts ? [...rebaseState.conflicts] : [];
 
   // Árbol del commit actual, para distinguir untracked (?) de modificado (~).
   const currentTree = (() => {
@@ -84,7 +86,37 @@ export default function StatusPanel({ repo, onOpenFile }) {
             </ul>
           )}
           <p className="text-[10px] text-orange-300/80 mt-2 leading-snug">
-            Edita los archivos, quita los marcadores <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code>, haz <code>git add</code> y commitea. O <code>git merge --abort</code>.
+            Pulsa el archivo para resolverlo visualmente, o edítalo a mano y haz <code>git add</code> + <code>git commit</code>. Para cancelar: <code>git merge --abort</code>.
+          </p>
+        </div>
+      )}
+
+      {/* Rebase banner */}
+      {rebaseState && (
+        <div className="rounded-md border border-purple-700 bg-purple-900/30 px-3 py-2">
+          <p className="text-xs uppercase tracking-wider text-purple-300 font-semibold">
+            ⚠ Rebase en curso
+          </p>
+          <p className="text-xs text-purple-100 mt-1">
+            Reaplicando sobre <span className="font-mono">{rebaseState.target}</span>
+          </p>
+          {rebaseConflicts.length > 0 && (
+            <ul className="mt-2 space-y-0.5">
+              {rebaseConflicts.map((f) => (
+                <li key={f} className="flex items-center gap-1.5 text-xs font-mono">
+                  <span className="text-red-400 flex-shrink-0">✗</span>
+                  <button
+                    onClick={() => onOpenFile?.(f, 'working')}
+                    className="text-red-200 truncate hover:text-red-100 hover:underline text-left"
+                  >
+                    {f}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-[10px] text-purple-300/80 mt-2 leading-snug">
+            Pulsa el archivo para resolverlo visualmente, haz <code>git add</code> y sigue con <code>git rebase --continue</code>. Para cancelar: <code>git rebase --abort</code>.
           </p>
         </div>
       )}
@@ -117,7 +149,7 @@ export default function StatusPanel({ repo, onOpenFile }) {
         ) : (
           <ul className="space-y-0.5">
             {[...stagingArea.keys()].map((f) => (
-              <li key={f} className="flex items-center gap-1.5 text-xs font-mono">
+              <li key={f} className="group flex items-center gap-1.5 text-xs font-mono">
                 <span className="text-green-400 font-bold flex-shrink-0">+</span>
                 <button
                   onClick={() => onOpenFile?.(f, 'staged')}
@@ -125,6 +157,15 @@ export default function StatusPanel({ repo, onOpenFile }) {
                 >
                   {f}
                 </button>
+                {onUnstage && (
+                  <button
+                    onClick={() => onUnstage(f)}
+                    title={`Sacar del staging: git restore --staged ${f}`}
+                    className="ml-auto flex-shrink-0 px-1 rounded text-gray-600 opacity-0 group-hover:opacity-100 hover:text-yellow-300 hover:bg-gray-800 transition-opacity"
+                  >
+                    ↩
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -139,7 +180,7 @@ export default function StatusPanel({ repo, onOpenFile }) {
               const tracked = currentTree.has(f) || stagingArea.has(f);
               const ignored = !tracked && matchesIgnore(f, ignoreRules);
               return (
-                <li key={f} className="flex items-center gap-1.5 text-xs font-mono">
+                <li key={f} className="group flex items-center gap-1.5 text-xs font-mono">
                   <span
                     className={`font-bold flex-shrink-0 ${
                       tracked ? 'text-yellow-400' : ignored ? 'text-gray-700' : 'text-gray-500'
@@ -162,6 +203,15 @@ export default function StatusPanel({ repo, onOpenFile }) {
                   </button>
                   {ignored && (
                     <span className="text-[9px] text-gray-600 flex-shrink-0">ignorado</span>
+                  )}
+                  {onStage && !ignored && (
+                    <button
+                      onClick={() => onStage(f)}
+                      title={`Preparar para commit: git add ${f}`}
+                      className="ml-auto flex-shrink-0 px-1 rounded text-gray-600 opacity-0 group-hover:opacity-100 hover:text-green-300 hover:bg-gray-800 transition-opacity"
+                    >
+                      +
+                    </button>
                   )}
                 </li>
               );
