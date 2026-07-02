@@ -73,7 +73,10 @@ export default function Header({
       <div className="flex items-center gap-4 min-w-0">
         <span className="text-white font-bold text-xl">GitPlay</span>
         {!sandboxMode && totalLessons > 0 && (
-          <div className="flex items-center gap-2 min-w-[180px]">
+          <div
+            className="flex items-center gap-2 min-w-[180px]"
+            title={`${lessonIndex} de ${totalLessons} lecciones completadas`}
+          >
             <span className="text-xs text-gray-500 font-mono whitespace-nowrap">
               {lessonIndex}/{totalLessons}
             </span>

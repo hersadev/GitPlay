@@ -86,7 +86,7 @@ export const module2 = [
     ],
     setupFiles: { 'darkMode.js': DARK_MODE_JS },
     curiosity:
-      'La barra "/" en `feature/dark-mode` no crea carpetas reales en disco: Git solo la usa como convención para agrupar ramas. Muchas herramientas (GitHub, GitKraken…) la aprovechan para mostrar las ramas en un árbol.',
+      'La barra "/" en `feature/dark-mode` no crea carpetas en tu proyecto: en el working directory no cambia nada. Pero dentro de `.git/refs/heads/` sí crea una carpeta real — por eso no puedes tener a la vez una rama `feature` y otra `feature/algo`. Muchas herramientas (GitHub, GitKraken…) además aprovechan esa convención para mostrar las ramas en árbol.',
   },
   {
     id: 'm2-l5',

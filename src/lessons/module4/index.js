@@ -1,4 +1,4 @@
-// Módulo 4 — Trabajo en equipo (6 lecciones)
+// Módulo 5 — Trabajo en equipo avanzado (7 lecciones)
 // HEAD desacoplado, reflog (red de seguridad), rebase y GitFlow.
 
 import {
