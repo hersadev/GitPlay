@@ -94,3 +94,34 @@ export const COMMAND_INFO = {
 };
 
 export const COMMAND_NAMES = Object.keys(COMMAND_INFO);
+
+// Comandos "git <cmd>" mencionados en un texto (busca solo entre COMMAND_NAMES).
+// Se usa para detectar, a partir de las pistas de las lecciones, qué comandos
+// se van a practicar — sin tener que anotarlos a mano en cada lección.
+const COMMAND_PATTERN = new RegExp(
+  `\\bgit\\s+(${[...COMMAND_NAMES].sort((a, b) => b.length - a.length).join('|')})\\b`,
+  'g'
+);
+
+function extractCommandNames(text) {
+  if (!text) return [];
+  const found = [];
+  let match;
+  COMMAND_PATTERN.lastIndex = 0;
+  while ((match = COMMAND_PATTERN.exec(text))) {
+    if (!found.includes(match[1])) found.push(match[1]);
+  }
+  return found;
+}
+
+// Comandos que se van a usar a lo largo de un módulo completo, deduplicados
+// en orden de aparición, con su ficha (usage + desc) de COMMAND_INFO.
+export function extractModuleCommands(moduleDef) {
+  const found = [];
+  for (const lesson of moduleDef?.lessons ?? []) {
+    for (const cmd of extractCommandNames((lesson.hints ?? []).join('\n'))) {
+      if (!found.includes(cmd)) found.push(cmd);
+    }
+  }
+  return found.map((cmd) => ({ cmd, ...COMMAND_INFO[cmd] }));
+}

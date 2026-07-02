@@ -22,3 +22,8 @@ export const MODULES = [
 ];
 
 export const ALL_LESSONS = MODULES.flatMap((m) => m.lessons);
+
+// Índice del módulo (0-based) al que pertenece cada lección, en el mismo
+// orden que ALL_LESSONS. Permite saber, a partir de lessonIndex, cuándo el
+// jugador entra en un módulo nuevo.
+export const LESSON_MODULE_INDEX = MODULES.flatMap((m, mi) => m.lessons.map(() => mi));
