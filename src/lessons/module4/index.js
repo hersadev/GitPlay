@@ -26,7 +26,7 @@ export const module4 = [
     id: 'm4-l1',
     title: 'HEAD desacoplado: viajar al pasado',
     description:
-      'Quieres revisar cómo estaba el código en v0.1.0 sin modificar nada. Haz `git checkout <hash>` para moverte a ese commit: HEAD queda "desacoplado" (no apunta a ninguna rama). Es solo lectura segura.',
+      'Quieres revisar el código tal como estaba en v0.1.0, sin tocar nada. `git checkout <hash>` mueve HEAD directamente a un commit, sin rama por medio: el famoso "detached HEAD". Asusta la primera vez, pero es una operación de solo lectura perfectamente segura — y manejarla con soltura es marca de veterano.',
     objectives: [
       {
         label: 'Moverte a un commit antiguo (HEAD desacoplado)',
@@ -45,7 +45,7 @@ export const module4 = [
     id: 'm4-l2',
     title: 'Salir del HEAD desacoplado',
     description:
-      'Para volver a un estado seguro, cámbiate a cualquier rama. Si hubieras hecho commits en modo desacoplado y quisieras conservarlos, primero crearías una rama desde ahí (`git switch -c <nombre>`).',
+      'Volver a terreno seguro es tan simple como cambiarte a cualquier rama. La regla que hay que saberse: si hubieras commiteado en modo desacoplado, esos commits quedarían huérfanos al salir — se rescatan creando una rama desde ahí ANTES de irte (`git switch -c <nombre>`).',
     objectives: [
       {
         label: 'Volver a una rama nombrada (no desacoplado)',
@@ -60,7 +60,7 @@ export const module4 = [
     id: 'm4-l3',
     title: 'reflog: la red de seguridad de Git',
     description:
-      'El reflog registra TODOS los movimientos de HEAD: commits, checkouts, resets, merges. Aunque borres commits con `reset --hard`, el reflog los conserva durante 90 días.',
+      'El reflog es el diario privado de HEAD: registra TODOS sus movimientos — commits, checkouts, resets, merges, rebases. Lo que `git log` ya no muestra, el reflog lo recuerda durante ~90 días. Consúltalo: es la razón por la que casi ningún desastre local es definitivo.',
     objectives: [
       { label: 'Consultar el reflog', validate: lastCmd('reflog') },
     ],
@@ -72,7 +72,7 @@ export const module4 = [
     id: 'm4-l4',
     title: 'Recuperar commits con reflog',
     description:
-      'Imagina que hiciste un `reset --hard HEAD~2` y borraste por error dos commits importantes. El reflog te muestra el hash que tenías antes — crea una rama desde ahí y los recuperas.',
+      'Simulacro de rescate: borra trabajo con `reset --hard`... y recupéralo. El reflog conserva el hash de donde estabas antes del destrozo; crea la rama `rescate` sobre ese hash y no se habrá perdido nada. Este movimiento te lo agradecerá tu yo del futuro.',
     objectives: [
       {
         label: 'El reflog tiene entradas de reset (simulaste pérdida en algún momento)',
@@ -96,7 +96,7 @@ export const module4 = [
     id: 'm4-l5',
     title: 'rebase: linealizar feature/dashboard',
     description:
-      'Tu compañero metió commits en main mientras tú trabajabas en `feature/dashboard`. Antes de mergear, rebasear tu rama "encima" de main produce una historia lineal, sin commit de merge.',
+      'main avanzó mientras trabajabas en `feature/dashboard`. Un merge lo resolvería, pero dejaría commit de merge; la alternativa es `git rebase main`: reaplica tus commits encima de main, uno a uno, y la historia queda lineal — como si hubieras empezado hoy. Monta el escenario (los archivos ya están en el working directory) y rebasea tu rama.',
     objectives: [
       {
         label: 'Tener feature/dashboard con Dashboard.jsx',
@@ -121,7 +121,7 @@ export const module4 = [
     id: 'm4-l5b',
     title: 'Rebase con conflicto: quédate con ambos',
     description:
-      'Mientras añadías el plan anual en `feature/precios`, tu compañero metió el plan enterprise en main tocando la MISMA zona de `precios.js`. Al rebasear, Git no puede decidir solo y verás los marcadores `<<<<<<<` en pantalla. Resuélvelo con el resolutor visual eligiendo CONSERVAR AMBOS cambios, y termina con `git rebase --continue`.',
+      'El caso serio: tú añadiste el plan anual en `feature/precios` y tu compañero metió el enterprise en main, tocando las MISMAS líneas de `precios.js`. El rebase se parará a medio camino con marcadores `<<<<<<<`. Resuélvelo con el resolutor visual CONSERVANDO AMBOS planes y remata con `git rebase --continue`. Recuerda la trampa: en un rebase, HEAD es la rama base — o sea, el trabajo de tu compañero.',
     objectives: [
       {
         label: 'Cambiarte a feature/precios (tu rama, ya con tu commit)',
@@ -179,7 +179,7 @@ export const module4 = [
     id: 'm4-l6',
     title: 'GitFlow: develop + feature branches',
     description:
-      'GitFlow organiza el trabajo en ramas estables: `main` (producción), `develop` (integración continua), `feature/*` (cada nueva feature). Las features se mergean a develop, no a main directamente.',
+      'GitFlow, el flujo clásico de los equipos grandes: `main` refleja producción, `develop` integra el trabajo diario y cada feature vive en su `feature/*` colgando de develop. Móntalo: crea develop, saca feature/notifications de ella, commitea y mergea de vuelta a develop. main ni se toca — queda reservada para releases.',
     objectives: [
       { label: 'Crear la rama develop', validate: hasBranch('develop') },
       {
