@@ -5,7 +5,6 @@ import {
   onBranch,
   hasBranch,
   lastCmd,
-  lastArg,
   fileOnBranch,
   isDetached,
   rebaseInProgress,

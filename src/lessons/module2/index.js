@@ -4,7 +4,6 @@
 import {
   onBranch,
   hasBranch,
-  lastCmd,
   fileOnBranch,
   hasMergeInBranch,
 } from '../_helpers';

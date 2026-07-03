@@ -71,10 +71,12 @@ export default function FileViewer({ file, repo, onClose, onSave, onMarkResolved
   const conflicted =
     !missing && !editing && canEdit && file.source === 'working' && hasConflictMarkers(content);
 
-  // Si se abre otro archivo, resetear el draft
+  // Si se abre otro archivo, resetear el draft. 'content' queda fuera de las
+  // deps a propósito: si cambia mientras se edita no debe pisar el borrador.
   useEffect(() => {
     setDraft(content);
     setEditing(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file.name, file.source, file.hash]);
 
   const dirty = editing && draft !== content;
@@ -90,7 +92,7 @@ export default function FileViewer({ file, repo, onClose, onSave, onMarkResolved
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6"
+      className="fixed inset-0 z-[55] bg-black/60 flex items-center justify-center p-6"
       onClick={onClose}
     >
       <motion.div

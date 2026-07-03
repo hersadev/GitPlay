@@ -98,7 +98,7 @@ export default function App() {
     if (moduleCommands.length === 0) return;
     if (seenModuleIntros.has(currentModule.id)) return;
     setModuleIntroOpen(true);
-  }, [currentModule?.id, welcomeOpen, recent, moduleCommands.length, seenModuleIntros]);
+  }, [currentModule, welcomeOpen, recent, moduleCommands.length, seenModuleIntros]);
 
   // Persist lesson index (y el máximo alcanzado, para el desbloqueo del selector)
   useEffect(() => {
@@ -119,7 +119,7 @@ export default function App() {
     if (!currentLesson) return;
     if (currentLesson.setupFiles) seedFiles(currentLesson.setupFiles);
     if (typeof currentLesson.setup === 'function') runSetup(currentLesson.setup);
-  }, [currentLesson?.id, seedFiles, runSetup]);
+  }, [currentLesson, seedFiles, runSetup]);
 
   // Advance only when isComplete transitions false → true (not on initial load).
   // Al completar la última lección avanza a ALL_LESSONS.length: el panel muestra
