@@ -126,15 +126,16 @@ export const BADGES = [
   },
   // Hitos por nivel: el umbral es el nº acumulado de lecciones hasta terminar
   // el último módulo del nivel, calculado desde MODULES (se ajusta solo al
-  // añadir lecciones o mover módulos de nivel).
+  // añadir lecciones o mover módulos de nivel). Las lecciones opcionales no
+  // cuentan: el nivel se completa al terminar todas las obligatorias.
   ...LEVELS.map((lvl) => {
     const lastModuleIdx = MODULES.reduce((acc, m, i) => (m.level === lvl.id ? i : acc), -1);
     const threshold = MODULES.slice(0, lastModuleIdx + 1).reduce(
-      (n, mod) => n + mod.lessons.length,
+      (n, mod) => n + mod.lessons.filter((l) => !l.optional).length,
       0
     );
     const n = MODULES.filter((m) => m.level === lvl.id).reduce(
-      (sum, m) => sum + m.lessons.length,
+      (sum, m) => sum + m.lessons.filter((l) => !l.optional).length,
       0
     );
     return {
@@ -149,7 +150,7 @@ export const BADGES = [
     id: 'graduate',
     name: 'Graduado',
     // Se otorga al completar todas las lecciones NO opcionales (el puente a
-    // Git real es opcional y tiene su propio badge de módulo).
+    // Git real es opcional y no cuenta para el 100%).
     description: `Completa las ${ALL_LESSONS.filter((l) => !l.optional).length} lecciones del curso.`,
     icon: '🎓',
     check: ({ lessonIndex, isComplete }) => {

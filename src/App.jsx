@@ -48,6 +48,10 @@ function listFiles(repo) {
   return [...names].sort().join('\n');
 }
 
+// Lecciones que cuentan para el 100% del curso: las opcionales (el puente a
+// Git real) quedan fuera del contador y de la barra de progreso del header.
+const CORE_LESSONS = ALL_LESSONS.filter((l) => !l.optional).length;
+
 export default function App() {
   const { repoState, runCommand, resetRepo, seedFiles, editFile, runSetup } = useGitEngine();
   const { lines, pushCommand, pushOutput, clear: clearTerminal } = useTerminalHistory();
@@ -251,8 +255,8 @@ export default function App() {
       onOpenGithub={() => setGithubOpen(true)}
       openPRsCount={(repoState.pullRequests ?? []).filter((p) => p.state === 'open').length}
       sandboxMode={sandboxMode}
-      lessonIndex={lessonIndex}
-      totalLessons={ALL_LESSONS.length}
+      lessonIndex={Math.min(lessonIndex, CORE_LESSONS)}
+      totalLessons={CORE_LESSONS}
       earnedCount={earned.size}
       totalBadges={BADGES.length}
     >
