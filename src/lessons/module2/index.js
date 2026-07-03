@@ -15,7 +15,7 @@ export const module2 = [
     id: 'm2-l1',
     title: 'Tu primera rama: feature/login',
     description:
-      'El login va a tocar varios archivos. Para no ensuciar main hasta que esté listo, créalo en su propia rama con `git branch`.',
+      'Todo tu trabajo vive de momento en `main`, la rama principal. Una rama es una línea de trabajo paralela: te deja desarrollar algo con calma sin tocar lo que ya funciona. El login va a llevar su tiempo, así que dale su propia rama con `git branch feature/login` y mira cómo aparece la etiqueta nueva en el grafo.',
     objectives: [
       {
         label: 'Crear la rama feature/login',
@@ -30,7 +30,7 @@ export const module2 = [
     id: 'm2-l2',
     title: 'Cambiarte a feature/login',
     description:
-      'Crear una rama no te mueve a ella: sigues en main. Usa `git switch` (o el más antiguo `git checkout`) para entrar.',
+      'Crear la rama no te ha movido a ella: sigues en main. El puntero que marca dónde estás se llama HEAD (fíjate en el grafo). Entra en la rama con `git switch feature/login` — a partir de ese momento tus commits irán a parar ahí.',
     objectives: [
       { label: 'Estar en feature/login', validate: onBranch('feature/login') },
     ],
@@ -42,7 +42,7 @@ export const module2 = [
     id: 'm2-l3',
     title: 'Commit del formulario en feature/login',
     description:
-      'Ahora que estás en la rama, implementa el formulario. Añade `Login.jsx` y commitea: estos cambios NO afectarán a main hasta que mergees.',
+      'Ya estás dentro. Ahora trabaja igual que en el módulo 1: añade `Login.jsx` y commitea. La diferencia está en dónde queda el commit: solo en feature/login. Mira el grafo — main se queda quieta, ajena a todo, hasta que tú decidas fusionar (eso llegará en un par de lecciones).',
     objectives: [
       { label: 'Estar en feature/login', validate: onBranch('feature/login') },
       {
@@ -63,7 +63,7 @@ export const module2 = [
     id: 'm2-l4',
     title: 'Crear y cambiar en un paso (feature/dark-mode)',
     description:
-      'Vas a empezar otra feature: el modo oscuro. `git switch -c <rama>` crea y entra de un golpe (equivale a `git branch` + `git switch`).',
+      'Toca otra feature: el modo oscuro. Crear una rama y entrar en ella es tan habitual que existe un atajo, `git switch -c <rama>`, que hace las dos cosas de golpe. Eso sí: vuelve primero a main, para que la rama nueva nazca de ahí y no de feature/login.',
     objectives: [
       {
         label: 'Tener la rama feature/dark-mode',
@@ -92,7 +92,7 @@ export const module2 = [
     id: 'm2-l5',
     title: 'La forma clásica: git checkout -b (feature/settings)',
     description:
-      'Antes de que existiera `git switch`, la forma habitual de crear-y-entrar era `git checkout -b <rama>`. Sigue funcionando y la verás en montones de tutoriales, así que conviene reconocerla. Crea la pantalla de ajustes con ella.',
+      'Antes de que existiera `git switch`, crear-y-entrar se hacía con `git checkout -b <rama>`. Hace exactamente lo mismo y te la cruzarás en miles de tutoriales y respuestas de Stack Overflow, así que conviene reconocerla. Practícala creando la pantalla de ajustes.',
     objectives: [
       {
         label: 'Crear la rama feature/settings con checkout -b',
@@ -121,7 +121,7 @@ export const module2 = [
     id: 'm2-l6',
     title: 'Listar las ramas',
     description:
-      'Cuando tienes varias features en paralelo, `git branch` te orienta: lista todas las ramas locales y marca con `*` en cuál estás.',
+      'Con tres features en marcha es fácil despistarse de dónde estás. `git branch` a secas no crea nada: lista todas tus ramas locales y marca con `*` la actual. Úsalo siempre que te sientas perdido (el grafo también te lo chiva).',
     objectives: [
       {
         label: 'Listar las ramas con git branch',
@@ -138,7 +138,7 @@ export const module2 = [
     id: 'm2-l7',
     title: 'Merge fast-forward de feature/login',
     description:
-      'El login está terminado. Vuelve a main y mergea: como main no avanzó mientras tanto, Git solo mueve el puntero — es un "fast-forward", sin commit de merge.',
+      'El login está listo y toca llevarlo a main: eso es un "merge" (fusionar una rama en otra). Se lanza desde la rama que RECIBE los cambios: vuelve a main y ejecuta `git merge feature/login`. Como main no se movió mientras trabajabas, Git solo adelanta su etiqueta hasta tu commit — un "fast-forward", sin commit extra.',
     objectives: [
       { label: 'Estar en main', validate: onBranch('main') },
       {
@@ -158,7 +158,7 @@ export const module2 = [
     id: 'm2-l8',
     title: 'Merge 3-way y limpiar la rama',
     description:
-      'Mientras tú trabajabas en dark-mode, otro dev actualizó el CHANGELOG en main. Ahora las dos ramas divergieron: el merge ya no es fast-forward, Git crea un commit de merge. Después, elimina la rama integrada con `branch -d`.',
+      'Esta vez main no se queda quieta: simula que otro dev actualiza el CHANGELOG commiteándolo en main. Las dos ramas han divergido, así que Git ya no puede solo adelantar la etiqueta: combinará ambos lados en un "commit de merge" con dos padres. Termina borrando la rama ya integrada con `git branch -d` — las ramas fusionadas no se coleccionan.',
     objectives: [
       {
         label: 'Hacer un commit en main (actualizar CHANGELOG.md)',

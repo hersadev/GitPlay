@@ -1,7 +1,7 @@
 // Definiciones de logros. Cada check recibe { repoState, lessonIndex, totalLessons, history }
 // y devuelve true cuando el badge se desbloquea.
 
-import { MODULES, ALL_LESSONS } from '../lessons';
+import { MODULES, ALL_LESSONS, LEVELS } from '../lessons';
 
 const STORAGE_KEY = 'gitplay:badges';
 
@@ -124,17 +124,24 @@ export const BADGES = [
         /rebase finished.*conflictos resueltos/.test(e.message ?? '')
       ),
   },
-  // Hitos por módulo: el umbral es el nº acumulado de lecciones hasta terminar
-  // ese módulo, calculado desde MODULES (se ajusta solo al añadir lecciones).
-  ...MODULES.map((m, i) => {
-    const threshold = MODULES.slice(0, i + 1).reduce((n, mod) => n + mod.lessons.length, 0);
-    const shortName = m.name.replace(/^Módulo \d+ — /, '');
-    const n = m.lessons.length;
+  // Hitos por nivel: el umbral es el nº acumulado de lecciones hasta terminar
+  // el último módulo del nivel, calculado desde MODULES (se ajusta solo al
+  // añadir lecciones o mover módulos de nivel).
+  ...LEVELS.map((lvl) => {
+    const lastModuleIdx = MODULES.reduce((acc, m, i) => (m.level === lvl.id ? i : acc), -1);
+    const threshold = MODULES.slice(0, lastModuleIdx + 1).reduce(
+      (n, mod) => n + mod.lessons.length,
+      0
+    );
+    const n = MODULES.filter((m) => m.level === lvl.id).reduce(
+      (sum, m) => sum + m.lessons.length,
+      0
+    );
     return {
-      id: m.id,
-      name: `Módulo ${i + 1} completado`,
-      description: `Termina "${shortName}" (${n} ${n === 1 ? 'lección' : 'lecciones'}).`,
-      icon: m.icon,
+      id: `nivel-${lvl.id}`,
+      name: `${lvl.name} completado`,
+      description: `Termina las ${n} lecciones del ${lvl.name.toLowerCase()}.`,
+      icon: lvl.icon,
       check: ({ lessonIndex }) => lessonIndex >= threshold,
     };
   }),
@@ -155,7 +162,11 @@ export const BADGES = [
 export function loadEarnedBadges() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return new Set(raw ? JSON.parse(raw) : []);
+    const ids = raw ? JSON.parse(raw) : [];
+    // Descartar ids de badges que ya no existen (p. ej. los antiguos
+    // "module-N" tras pasar a hitos por nivel): inflarían el contador.
+    const known = new Set(BADGES.map((b) => b.id));
+    return new Set(ids.filter((id) => known.has(id)));
   } catch {
     return new Set();
   }

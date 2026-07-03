@@ -28,7 +28,7 @@ export const moduleGithub = [
     id: 'gh-l1',
     title: 'Tu primer push a origin',
     description:
-      'Tienes tu repo local, pero todavía no está en GitHub. `git push origin main` sube tus commits al remoto por primera vez. Verás aparecer la etiqueta `origin/main` en el grafo (con borde discontinuo).',
+      'Hasta ahora todo pasaba en tu máquina. GitHub guarda una copia del repositorio en la nube — el "remoto", que por convención se llama `origin` — para poder compartirla con tu equipo. `git push origin main` sube tus commits por primera vez. Verás aparecer `origin/main` en el grafo (borde discontinuo): así recuerda tu repo local dónde está el remoto.',
     objectives: [
       { label: 'Estar en main con al menos un commit', validate: (s) => onBranch('main')(s) && s.branches.get('main') },
       { label: 'Hacer push de main a origin', validate: branchOnRemote('main') },
@@ -46,7 +46,7 @@ export const moduleGithub = [
     id: 'gh-l2',
     title: 'Pushear una feature branch',
     description:
-      'Implementaste la pantalla de perfil en `feature/profile`. Para abrir un PR primero hay que pushear esa rama a origin.',
+      'Implementaste la pantalla de perfil en `feature/profile` — crear la rama y commitear ya es rutina para ti. Lo nuevo: para poder abrir una Pull Request, la rama tiene que existir en el remoto. Pushéala a origin.',
     objectives: [
       { label: 'Crear la rama feature/profile', validate: hasBranch('feature/profile') },
       { label: 'Commitear Profile.jsx en feature/profile', validate: fileOnBranch('Profile.jsx', 'feature/profile') },
@@ -66,7 +66,7 @@ export const moduleGithub = [
     id: 'gh-l3',
     title: 'Abrir tu primera Pull Request',
     description:
-      'Con la rama pusheada, abre la vista de GitHub (botón 🐙 del header) y crea una Pull Request de `feature/profile` hacia `main`. Es la propuesta formal: "quiero meter estos commits en main".',
+      'Con la rama en origin, abre la vista de GitHub (botón 🐙 de la cabecera) y crea una Pull Request de `feature/profile` hacia `main`. La PR es la propuesta formal — "quiero meter estos commits en main" — y el lugar donde el equipo revisa tu código antes de integrarlo.',
     objectives: [
       { label: 'feature/profile está en origin', validate: branchOnRemote('feature/profile') },
       { label: 'Hay un PR abierto de feature/profile → main', validate: hasOpenPR('feature/profile', 'main') },
@@ -84,7 +84,7 @@ export const moduleGithub = [
     id: 'gh-l4',
     title: 'Mergear el PR en GitHub',
     description:
-      'Tu PR ya tiene aprobación (en la vida real serían tus compañeros revisando). Vete a la vista de GitHub, abre el PR y pulsa "Merge PR". El merge ocurre en el remoto, no en tu copia local.',
+      'Tu PR ya tiene aprobación (en la vida real serían tus compañeros revisando). Ve a la vista de GitHub, abre el PR y pulsa "Merge PR". Fíjate bien en el grafo después: el merge ocurre en el remoto — tu copia local todavía no se entera.',
     objectives: [
       { label: 'Existe un PR abierto de feature/profile → main', validate: (s) => hasOpenPR('feature/profile', 'main')(s) || hasMergedPR('feature/profile', 'main')(s) },
       { label: 'PR mergeado en main', validate: hasMergedPR('feature/profile', 'main') },
@@ -102,7 +102,7 @@ export const moduleGithub = [
     id: 'gh-l5',
     title: 'Sincronizar local con git pull',
     description:
-      'Tu rama main local está desactualizada: el merge ocurrió en GitHub. `git pull` trae los commits del remoto y los integra en tu rama actual.',
+      'El merge del PR ocurrió en GitHub, así que tu main local se quedó atrás. `git pull` trae los commits nuevos del remoto y los integra en tu rama actual (por debajo son dos pasos: `git fetch` + `git merge`). Sincronízate.',
     objectives: [
       { label: 'Estar en main', validate: onBranch('main') },
       { label: 'main local sincronizado con origin/main', validate: branchSynced('main') },
@@ -120,7 +120,7 @@ export const moduleGithub = [
     id: 'gh-l6',
     title: 'Conflicto al pullear',
     description:
-      'Tu compañera modificó el `README.md` y mergeó su PR. Mientras tanto, tú también lo editaste localmente. Al hacer `git pull` chocaréis: tendrás que resolver el conflicto a mano y subir el resultado con `git push`.',
+      'Tu compañera modificó el `README.md` y mergeó su PR. Mientras tanto, tú también lo editaste en local. Al hacer `git pull` los dos cambios chocan: te toca resolver tu primer conflicto y subir el resultado con `git push`. Tranquilidad — un conflicto no es un error, es Git pidiéndote que decidas tú.',
     objectives: [
       { label: 'Tienes un commit local que toca README.md', validate: (s) => fileOnBranch('README.md', 'main')(s) },
       { label: 'Conflicto resuelto y pusheado (main sincronizado con origin)', validate: (s) => mergeResolved(s) && branchSynced('main')(s) },
@@ -151,7 +151,7 @@ export const moduleGithub = [
     id: 'gh-l7',
     title: 'Workflow completo: feature → PR → merge → pull',
     description:
-      'Aplica todo el ciclo end-to-end. Tu compañero añadió `feature-flags.js` a main mientras tú implementabas algo en una rama. Tu objetivo: ramificar, commitear, pushear, abrir PR, mergearlo y dejar tu local sincronizado.',
+      'El examen del módulo: el ciclo completo, tú solo. Mientras implementas el toggle de tema en una rama, tu compañero mete `feature-flags.js` en main. Tu objetivo: ramificar, commitear, pushear, abrir la PR, mergearla y dejar tu main local sincronizado con todo.',
     objectives: [
       { label: 'Tienes una rama feature/dark-toggle con tu commit (darkToggle.js)', validate: fileOnBranch('darkToggle.js', 'feature/dark-toggle') },
       { label: 'feature/dark-toggle está en origin', validate: branchOnRemote('feature/dark-toggle') },

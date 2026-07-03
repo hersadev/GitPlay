@@ -131,7 +131,7 @@ export const module3 = [
     id: 'm3-l3',
     title: 'reset --hard: descartar un experimento',
     description:
-      'Probaste algo en `experimento.js`, lo commiteaste, y decides que no quieres conservarlo. `git reset --hard HEAD~1` borra el commit Y los archivos. Cuidado: solo el reflog puede recuperarlo (lo veremos en el módulo 4).',
+      'Probaste algo en `experimento.js`, lo commiteaste, y decides que no quieres conservarlo. `git reset --hard HEAD~1` borra el commit Y los archivos. Cuidado: solo el reflog puede recuperarlo (lo verás en el nivel avanzado).',
     objectives: [
       {
         label: 'Crear un commit con experimento.js',

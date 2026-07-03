@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { LEVELS } from '../../lessons';
 
 // Modal que anuncia, al entrar en un módulo nuevo, qué comandos se van a
 // practicar en él. Se cierra pinchando la X, pinchando fuera (backdrop),
@@ -14,6 +15,8 @@ export default function ModuleIntroModal({ moduleDef, commands, onClose }) {
   }, [onClose]);
 
   if (!moduleDef) return null;
+
+  const level = LEVELS.find((l) => l.id === moduleDef.level);
 
   return (
     <motion.div
@@ -45,6 +48,13 @@ export default function ModuleIntroModal({ moduleDef, commands, onClose }) {
 
         <div className="p-6 pb-4 text-center flex-shrink-0">
           <p className="text-4xl mb-2">{moduleDef.icon}</p>
+          {level && (
+            <span
+              className={`inline-block text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 mb-1.5 ${level.chipClass}`}
+            >
+              {level.icon} {level.name}
+            </span>
+          )}
           <h2 className="text-xl font-bold text-white">{moduleDef.name}</h2>
           <p className="text-sm text-gray-400 mt-1.5 leading-snug">
             Estos son los comandos que vas a usar en este módulo:

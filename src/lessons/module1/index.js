@@ -23,7 +23,7 @@ export const module1 = [
     id: 'm1-l1',
     title: 'Arrancar TaskFlow',
     description:
-      'Vas a construir TaskFlow, una app de gestión de tareas. Lo primero: convertir esta carpeta en un repositorio Git con `git init`.',
+      'Vas a construir TaskFlow, una app de gestión de tareas — y Git va a guardar cada paso. Git es la herramienta que registra la historia de un proyecto: qué cambió, cuándo y quién lo hizo. Lo primero es pedirle que vigile esta carpeta convirtiéndola en un "repositorio": escribe `git init` en el terminal de abajo.',
     objectives: [
       { label: 'Inicializar el repositorio', validate: initialized },
     ],
@@ -35,7 +35,7 @@ export const module1 = [
     id: 'm1-l2',
     title: 'El primer commit: README.md',
     description:
-      'Todo proyecto necesita un README explicando qué hace. Añádelo al staging y crea el primer commit del proyecto.',
+      'Un commit es una foto del proyecto en un momento concreto; la historia de un repositorio es una cadena de commits. Se hace en dos pasos: con `git add` eliges qué entra en la foto (esa sala de espera se llama "staging area") y con `git commit -m "mensaje"` la disparas. Estrena el proyecto commiteando el README, el archivo que explica qué hace.',
     objectives: [
       {
         label: 'Añadir README.md al staging area',
@@ -59,7 +59,7 @@ export const module1 = [
     id: 'm1-l3',
     title: 'Inspeccionar el estado con git status',
     description:
-      'Antes de cada commit conviene revisar qué hay en el staging. Añade `package.json`, mira el estado con `git status` y luego commitea.',
+      'Entre archivos cambiados, preparados y commiteados es fácil perderse: ¿qué he tocado?, ¿qué entrará en el próximo commit? `git status` responde a eso en cualquier momento — es el comando que más escribirás en tu vida. Añade `package.json`, commitéalo, y comprueba con `git status` que todo quedó limpio.',
     objectives: [
       {
         label: 'Añadir package.json al staging',
@@ -87,7 +87,7 @@ export const module1 = [
     id: 'm1-l4',
     title: 'Ver los cambios con git diff',
     description:
-      'Editaste el README (una línea nueva y marcaste "Login" como hecho) pero aún no lo has commiteado. Antes de preparar nada, `git diff` te muestra línea a línea qué cambió respecto al último commit: lo verde (+) se añade, lo rojo (−) se quita.',
+      'Editaste el README (una línea nueva y "Login" marcado como hecho) pero aún no lo has commiteado. ¿Y si no recuerdas exactamente qué tocaste? `git diff` compara tus archivos con el último commit y muestra los cambios línea a línea: lo verde con + es nuevo, lo rojo con − desaparece.',
     objectives: [
       { label: 'Inspeccionar los cambios sin preparar con git diff', validate: lastCmd('diff') },
     ],
@@ -106,7 +106,7 @@ export const module1 = [
     id: 'm1-l5',
     title: 'Varios archivos en un solo commit',
     description:
-      'TaskFlow necesita una estructura mínima: `index.html`, `app.js` y `styles.css`. Mételos todos en un único commit con `git add .`.',
+      'No hace falta un commit por archivo: lo normal es agrupar en un commit los archivos que juntos forman un cambio con sentido. TaskFlow necesita su estructura mínima — `index.html`, `app.js` y `styles.css` ya te esperan. Prepáralos los tres (puedes hacerlo de golpe con `git add .`) y crea un único commit.',
     objectives: [
       {
         label: 'Tener index.html commiteado en main',
@@ -138,7 +138,7 @@ export const module1 = [
     id: 'm1-l6',
     title: 'Ver el historial con git log',
     description:
-      'Ya tienes varios commits. `git log` muestra la línea de tiempo del proyecto: hash, autor, fecha y mensaje de cada uno.',
+      'Ya tienes una pequeña historia. `git log` la muestra completa: los commits del más nuevo al más viejo, cada uno con su identificador (el "hash"), su autor, su fecha y su mensaje. Échale un vistazo a lo que llevas construido.',
     objectives: [
       { label: 'Consultar el historial con git log', validate: lastCmd('log') },
     ],
@@ -150,7 +150,7 @@ export const module1 = [
     id: 'm1-l7',
     title: 'Mensajes convencionales: corrige un bug',
     description:
-      'La convención más usada (Conventional Commits) prefija el mensaje: `feat:` para nuevas features, `fix:` para bugs, `docs:`, `chore:`, `refactor:`. Crea un commit con un `fix:` simulando que arreglas algo en TaskFlow.',
+      'Los mensajes de commit se escriben para el futuro: dentro de seis meses, "arreglos varios" no te dirá nada. La convención más usada (Conventional Commits) los prefija por tipo: `feat:` para funcionalidad nueva, `fix:` para bugs, `docs:` para documentación, `chore:` para mantenimiento. Simula que arreglas un bug en TaskFlow y commitea con un mensaje que empiece por `fix:`.',
     objectives: [
       {
         label: 'Crear un commit con prefijo "fix:"',
