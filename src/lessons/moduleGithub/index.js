@@ -4,12 +4,9 @@
 import {
   onBranch,
   hasBranch,
-  lastCmd,
-  lastArg,
   fileOnBranch,
   branchOnRemote,
   branchSynced,
-  hasRemoteRef,
   hasOpenPR,
   hasMergedPR,
   mergeResolved,
@@ -17,7 +14,6 @@ import {
 import {
   PROFILE_JSX,
   README_BASE,
-  README_LOCAL_EDIT,
   README_TEAMMATE_EDIT,
   FEATURE_FLAGS_JS,
   DARK_TOGGLE_JS,

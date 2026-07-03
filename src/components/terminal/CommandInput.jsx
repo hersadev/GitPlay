@@ -8,7 +8,6 @@ const COMMANDS = [
 ];
 
 function autocomplete(text, repoState) {
-  const parts = text.split(/(\s+)/).filter(Boolean); // conserva espacios para no perder el cursor
   const endsWithSpace = /\s$/.test(text);
   const tokens = text.trim().length ? text.trim().split(/\s+/) : [];
 

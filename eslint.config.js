@@ -28,6 +28,11 @@ export default [
       ...react.configs.recommended.rules,
       ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
+      // El proyecto no usa PropTypes: los componentes se documentan por uso.
+      'react/prop-types': 'off',
+      // catch vacío = fallo silenciado a propósito (localStorage, checks de badges).
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       'react/jsx-no-target-blank': 'off',
       'react-refresh/only-export-components': [
         'warn',

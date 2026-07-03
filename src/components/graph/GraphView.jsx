@@ -306,7 +306,7 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
           <text x="172" y="29" textAnchor="middle" dominantBaseline="middle" fontSize="12" fill="#6b7280" fontFamily="monospace">?</text>
         </svg>
         <p className="text-gray-500 text-sm">El grafo aparecerá con tu primer commit</p>
-        <p className="text-gray-700 text-xs font-mono">git init → git add archivo → git commit -m "..."</p>
+        <p className="text-gray-700 text-xs font-mono">git init → git add archivo → git commit -m &quot;...&quot;</p>
       </div>
     );
   }

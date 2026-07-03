@@ -26,7 +26,7 @@ export function useBadges({ repoState, lessonIndex, totalLessons, isComplete }) 
       // Encolar los logros desbloqueados para anunciarlos uno a uno en el modal
       setQueue((q) => [...q, ...newly]);
     }
-  }, [repoState, lessonIndex, totalLessons, isComplete]);
+  }, [repoState, lessonIndex, totalLessons, isComplete, earned]);
 
   function reset() {
     clearEarnedBadges();

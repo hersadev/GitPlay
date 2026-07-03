@@ -55,11 +55,11 @@ function suggestCommand(typo) {
 }
 
 const COMMANDS = {
-  init:           (e, args) => e.init(),
+  init:           (e) => e.init(),
   add:            (e, args) => e.add(args),
   commit:         (e, args) => e.commit(args),
-  status:         (e, args) => e.status(),
-  log:            (e, args) => e.log(),
+  status:         (e) => e.status(),
+  log:            (e) => e.log(),
   branch:         (e, args) => e.branch(args),
   checkout:       (e, args) => e.checkout(args),
   switch:         (e, args) => e.switch(args),
@@ -71,7 +71,7 @@ const COMMANDS = {
   tag:            (e, args) => e.tag(args),
   'cherry-pick':  (e, args) => e.cherryPick(args),
   rebase:         (e, args) => e.rebase(args),
-  reflog:         (e, args) => e.reflog(),
+  reflog:         (e) => e.reflog(),
   diff:           (e, args) => e.diff(args),
   push:           (e, args) => e.push(args),
   pull:           (e, args) => e.pull(args),
