@@ -5,11 +5,10 @@ import {
   onBranch,
   hasBranch,
   hasTag,
-  lastCmd,
-  lastArg,
   fileOnBranch,
   fileNotOnBranch,
   hasFileAnywhere,
+  rebasedOnto,
 } from '../_helpers';
 import {
   EXPERIMENTAL_JS,
@@ -111,8 +110,10 @@ export const module5 = [
         validate: fileOnBranch('Payments.jsx', 'feature/payments'),
       },
       {
+        // Estado del grafo, no último comando: el objetivo 3 obliga a cambiar a
+        // main, y con lastCmd el rebase se "desmarcaba" al hacer git switch.
         label: 'Rebasear feature/payments sobre main',
-        validate: (s) => onBranch('feature/payments')(s) && lastCmd('rebase')(s),
+        validate: rebasedOnto('feature/payments', 'main'),
       },
       {
         label: 'Mergear feature/payments a main (con Payments.jsx integrado)',
