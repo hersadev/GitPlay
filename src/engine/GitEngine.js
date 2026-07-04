@@ -638,7 +638,9 @@ export class GitEngine {
     if (currentHash === targetHash) return { ok: true, output: 'Ya está actualizado.' };
 
     if (this._isAncestor(currentHash, targetHash)) {
-      this.branches.set(this.HEAD, targetHash);
+      // En detached solo se mueve HEAD (como git real): nada de crear "ramas" con nombre de hash.
+      if (this._isDetached()) this.HEAD = targetHash;
+      else this.branches.set(this.HEAD, targetHash);
       this._addReflog(this.HEAD, targetHash, `merge ${target}: Fast-forward`);
       return { ok: true, output: `Avance rápido (Fast-forward)\n${currentHash ?? '(inicio)'} → ${targetHash}` };
     }
@@ -692,7 +694,8 @@ export class GitEngine {
         files: [...mergedTree.keys()].filter((n) => currentTree.get(n) !== mergedTree.get(n)),
         tree: mergedTree,
       });
-      this.branches.set(this.HEAD, hash);
+      if (this._isDetached()) this.HEAD = hash;
+      else this.branches.set(this.HEAD, hash);
       this._addReflog(this.HEAD, hash, `merge ${target}: Merge realizado`);
       return { ok: true, output: `Merge realizado (estrategia 'ort').\ncommit de merge: ${hash}` };
     }
@@ -1388,12 +1391,36 @@ export class GitEngine {
       this.remoteBranches.set(pr.into, fromHash);
       this.remoteRefs.set(`origin/${pr.into}`, fromHash);
     } else {
-      // Merge commit en el remoto.
-      const mergeHash = generateHash();
+      // Merge commit en el remoto, con 3 vías de verdad (base común, into, from):
+      // solo se aplican los cambios del PR respecto a la base, para no pisar los
+      // avances de la rama destino con copias viejas de la rama del PR.
+      const baseHash = this._findCommonAncestor(intoHash, fromHash, this.remoteCommits);
+      const baseTree = baseHash ? this.remoteCommits.get(baseHash)?.tree ?? new Map() : new Map();
       const intoTree = this.remoteCommits.get(intoHash)?.tree ?? new Map();
       const fromTree = this.remoteCommits.get(fromHash)?.tree ?? new Map();
       const mergedTree = new Map(intoTree);
-      fromTree.forEach((v, k) => mergedTree.set(k, v));
+      const conflicts = [];
+      const allFiles = new Set([...intoTree.keys(), ...fromTree.keys(), ...baseTree.keys()]);
+      for (const f of allFiles) {
+        const base = baseTree.get(f);
+        const ours = intoTree.get(f);    // rama destino
+        const theirs = fromTree.get(f);  // rama del PR
+        if (ours === theirs) continue;   // idéntico (o ausente) en ambos lados
+        if (theirs === base) continue;   // solo cambió la rama destino: se conserva
+        if (ours === base) {             // solo cambió el PR: aplicar su versión
+          if (theirs === undefined) mergedTree.delete(f);
+          else mergedTree.set(f, theirs);
+          continue;
+        }
+        conflicts.push(f);               // ambos divergen: GitHub bloquearía el merge
+      }
+      if (conflicts.length) {
+        return {
+          ok: false,
+          output: `El PR #${pr.id} tiene conflictos con ${pr.into} en: ${conflicts.join(', ')}.\nEn local: actualiza ${pr.into} (git pull), mergea ${pr.into} en ${pr.from}, resuelve los conflictos y pushea. Después reintenta.`,
+        };
+      }
+      const mergeHash = generateHash();
       this.remoteCommits.set(mergeHash, {
         hash: mergeHash,
         message: `Merge pull request #${pr.id} from ${pr.from}`,
@@ -1450,6 +1477,9 @@ export class GitEngine {
     if (this.rebaseState) {
       return { ok: false, output: 'No puedes cambiar de rama en medio de un rebase.\nTermínalo con `git rebase --continue` o cancélalo con `git rebase --abort`.' };
     }
+    if (this.mergeState) {
+      return { ok: false, output: 'No puedes cambiar de rama en medio de un merge con conflictos.\nResuélvelos y commitea, o cancela con `git merge --abort`.' };
+    }
     const prev = this.HEAD;
     if (this.branches.has(target)) {
       this.HEAD = target;
@@ -1495,8 +1525,8 @@ export class GitEngine {
     return out;
   }
 
-  _findCommonAncestor(hashA, hashB) {
-    const ancestorsA = this._collectAncestors(hashA);
+  _findCommonAncestor(hashA, hashB, commitMap = this.commits) {
+    const ancestorsA = this._collectAncestors(hashA, commitMap);
     // BFS desde B para encontrar el ancestro común más cercano a B.
     const queue = [hashB];
     const visited = new Set();
@@ -1505,7 +1535,7 @@ export class GitEngine {
       if (!cur || visited.has(cur)) continue;
       if (ancestorsA.has(cur)) return cur;
       visited.add(cur);
-      const c = this.commits.get(cur);
+      const c = commitMap.get(cur);
       if (c) queue.push(c.parent, c.secondParent);
     }
     return null;
