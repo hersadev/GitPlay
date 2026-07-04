@@ -33,15 +33,15 @@ export const COMMAND_INFO = {
   },
   branch: {
     usage: 'git branch · git branch <nombre> · git branch -d <nombre>',
-    desc: 'Sin argumentos lista las ramas (la actual con *). Con nombre crea una rama nueva; con -d borra una ya integrada.',
+    desc: 'Sin argumentos lista las ramas (la actual con *). Con nombre crea una rama nueva; con -d borra una ya integrada (con -D la borra aunque no esté fusionada).',
   },
   checkout: {
     usage: 'git checkout <rama|hash> · git checkout -b <rama>',
     desc: 'La forma clásica de moverse: cambia de rama o viaja a un commit (HEAD desacoplado). Con -b crea la rama y entra en un paso.',
   },
   switch: {
-    usage: 'git switch <rama> · git switch -c <rama>',
-    desc: 'La forma moderna de cambiar de rama. Con -c crea la rama y se mueve a ella en un solo paso.',
+    usage: 'git switch <rama> · git switch -c <rama> · git switch --detach <hash>',
+    desc: 'La forma moderna de cambiar de rama. Con -c crea la rama y se mueve a ella en un solo paso; con --detach viaja a un commit (HEAD desacoplado).',
   },
   merge: {
     usage: 'git merge <rama> · git merge --abort',
@@ -64,8 +64,8 @@ export const COMMAND_INFO = {
     desc: 'Guarda tu trabajo a medias en una pila y deja el workspace limpio. Con pop lo recuperas; con list ves lo guardado.',
   },
   tag: {
-    usage: 'git tag · git tag <nombre>',
-    desc: 'Marca un commit con una etiqueta fija (típicamente versiones: v1.0.0). Sin argumentos lista las etiquetas existentes.',
+    usage: 'git tag · git tag <nombre> · git tag -a <nombre> -m "mensaje"',
+    desc: 'Marca un commit con una etiqueta fija (típicamente versiones: v1.0.0). Con -a la crea anotada (con mensaje). Sin argumentos lista las etiquetas existentes.',
   },
   'cherry-pick': {
     usage: 'git cherry-pick <hash>',

@@ -553,6 +553,10 @@ export class GitEngine {
       if (!name) return { ok: false, output: 'Uso: git branch -d <rama>' };
       if (name === this.HEAD) return { ok: false, output: `error: no se puede borrar la rama '${name}' en la que estás.` };
       if (!this.branches.has(name)) return { ok: false, output: `error: la rama '${name}' no existe.` };
+      // -d solo borra ramas ya integradas (alcanzables desde HEAD); -D fuerza.
+      if (args[0] === '-d' && !this._isAncestor(this.branches.get(name), this._currentCommitHash())) {
+        return { ok: false, output: `error: la rama '${name}' no está completamente fusionada.\nSi estás seguro de que quieres borrarla, ejecuta 'git branch -D ${name}'.` };
+      }
       this.branches.delete(name);
       return { ok: true, output: `Eliminada la rama ${name}.` };
     }
@@ -586,7 +590,7 @@ export class GitEngine {
 
   switch(args) {
     if (!this.initialized) return this._notInit();
-    if (!args.length) return { ok: false, output: 'Uso: git switch <rama>' };
+    if (!args.length) return { ok: false, output: 'Uso: git switch <rama>\n       git switch -c <rama>\n       git switch --detach <hash>' };
     this._setLast('switch', args);
     if (args[0] === '-c') {
       const name = args[1];
@@ -595,7 +599,21 @@ export class GitEngine {
       if (!r.ok) return r;
       return this._switchTo(name);
     }
-    return this._switchTo(args[0]);
+    // A diferencia de checkout, switch solo acepta ramas: moverse a un commit
+    // (HEAD desacoplado) hay que pedirlo explícitamente con --detach.
+    if (args[0] === '--detach' || args[0] === '-d') {
+      const hash = this._resolveRef(args[1]);
+      if (!hash) return { ok: false, output: `fatal: referencia inválida: ${args[1] ?? 'HEAD'}` };
+      return this._switchTo(hash);
+    }
+    const target = args[0];
+    if (!this.branches.has(target)) {
+      if (this._findCommit(target)) {
+        return { ok: false, output: `fatal: se esperaba una rama, se obtuvo el commit '${target}'.\nPara inspeccionarlo con HEAD desacoplado: git switch --detach ${target}` };
+      }
+      return { ok: false, output: `fatal: referencia inválida: ${target}` };
+    }
+    return this._switchTo(target);
   }
 
   merge(args) {
@@ -907,8 +925,27 @@ export class GitEngine {
       this.tags.delete(name);
       return { ok: true, output: `Eliminada la etiqueta '${name}'` };
     }
-    const name = args[0];
-    const targetHash = args[1] ? this._resolveRef(args[1]) : this._currentCommitHash();
+    // git tag [-a] <nombre> [-m "mensaje"] [<ref>] — el simulador no distingue
+    // annotated de lightweight, pero acepta la sintaxis para que `-a` no acabe
+    // convertido en el nombre de la etiqueta.
+    const rest = [...args];
+    const annotated = rest[0] === '-a';
+    if (annotated) rest.shift();
+    const mIdx = rest.indexOf('-m');
+    let message = null;
+    if (mIdx !== -1) {
+      message = rest[mIdx + 1];
+      if (message === undefined) return { ok: false, output: 'fatal: falta el mensaje tras -m.' };
+      rest.splice(mIdx, 2);
+    }
+    if (annotated && message === null) {
+      return { ok: false, output: 'fatal: un tag anotado necesita mensaje: git tag -a <nombre> -m "mensaje"' };
+    }
+    const name = rest.shift();
+    if (!name || name.startsWith('-')) {
+      return { ok: false, output: 'Uso: git tag <nombre> [<hash>]\n       git tag -a <nombre> -m "mensaje"' };
+    }
+    const targetHash = rest[0] ? this._resolveRef(rest[0]) : this._currentCommitHash();
     if (!targetHash) return { ok: false, output: 'No hay commits para etiquetar.' };
     this.tags.set(name, targetHash);
     return { ok: true, output: '' };
