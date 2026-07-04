@@ -637,6 +637,10 @@ export class GitEngine {
     if (!targetHash) return { ok: false, output: `La rama '${target}' no tiene commits.` };
     if (currentHash === targetHash) return { ok: true, output: 'Ya está actualizado.' };
 
+    // Como git real: abortar si el merge pisaría cambios locales sin commitear.
+    const pisados = this._localChangesOverwrittenBy(currentHash, targetHash);
+    if (pisados.length) return this._overwrittenByMergeError(pisados);
+
     if (this._isAncestor(currentHash, targetHash)) {
       // En detached solo se mueve HEAD (como git real): nada de crear "ramas" con nombre de hash.
       if (this._isDetached()) this.HEAD = targetHash;
@@ -717,6 +721,35 @@ export class GitEngine {
     return {
       ok: false,
       output: `Auto-merging…\n${list}\nMerge automático fallido. Resuelve los conflictos y commitea el resultado.\nO ejecuta \`git merge --abort\`.`,
+    };
+  }
+
+  // Archivos con cambios sin commitear (working o staging) que el merge de
+  // `targetHash` sobre `currentHash` modificaría. Git real aborta en ese caso
+  // en vez de pisarlos; merge() y pull() usan esta lista para imitarlo.
+  _localChangesOverwrittenBy(currentHash, targetHash) {
+    const baseHash = this._findCommonAncestor(currentHash, targetHash);
+    const baseTree = baseHash ? this._treeOf(baseHash) : new Map();
+    const currentTree = currentHash ? this._treeOf(currentHash) : new Map();
+    const targetTree = this._treeOf(targetHash);
+    const dirty = [];
+    for (const f of new Set([...currentTree.keys(), ...targetTree.keys()])) {
+      const ours = currentTree.get(f);
+      const theirs = targetTree.get(f);
+      if (ours === theirs) continue; // idéntico en ambos lados: el merge no lo toca
+      if (theirs === baseTree.get(f)) continue; // solo cambiamos nosotros: se conserva el nuestro
+      if (this.workingDirectory.has(f) || this.stagingArea.has(f)) dirty.push(f);
+    }
+    return dirty;
+  }
+
+  _overwrittenByMergeError(files) {
+    return {
+      ok: false,
+      output:
+        'error: Tus cambios locales en los siguientes archivos serían sobrescritos por el merge:\n' +
+        files.map((f) => `  ${f}`).join('\n') +
+        '\nHaz commit de tus cambios (o `git stash`) antes de mergear.\nAbortando',
     };
   }
 
@@ -1189,8 +1222,17 @@ export class GitEngine {
     if (!this.initialized) return this._notInit();
     this._setLast('push', args);
 
-    // git push [origin] [rama]
-    const filtered = args.filter((a) => a !== 'origin');
+    // git push [-u|--set-upstream] [origin] [rama]
+    const flags = args.filter((a) => a.startsWith('-'));
+    const desconocidos = flags.filter((a) => a !== '-u' && a !== '--set-upstream');
+    if (desconocidos.length) {
+      return {
+        ok: false,
+        output: `error: opción '${desconocidos[0]}' no soportada en el simulador.\nUso: git push [-u] [origin] [<rama>]`,
+      };
+    }
+    const setUpstream = flags.length > 0;
+    const filtered = args.filter((a) => a !== 'origin' && !a.startsWith('-'));
     const branchArg = filtered[0] ?? this.HEAD;
     if (!this.branches.has(branchArg)) {
       return { ok: false, output: `error: src refspec '${branchArg}' no coincide con ninguna rama local.` };
@@ -1237,7 +1279,10 @@ export class GitEngine {
     const summary = toPush.length === 0
       ? 'Todo actualizado.'
       : `${toPush.length} commit(s) subido(s).\n   ${remoteHash?.slice(0, 7) ?? '(nuevo)'}..${shortHash}  ${branchArg} -> ${branchArg}`;
-    return { ok: true, output: `To origin\n   ${summary}` };
+    const tracking = setUpstream
+      ? `\nLa rama '${branchArg}' quedó configurada para seguir a 'origin/${branchArg}'.`
+      : '';
+    return { ok: true, output: `To origin\n   ${summary}${tracking}` };
   }
 
   fetch(args) {
@@ -1291,6 +1336,12 @@ export class GitEngine {
     // Reusar merge: simular un merge desde un "pseudo-branch" origin/<branch>.
     const localHash = this.branches.get(branch);
     if (remoteHash === localHash) return { ok: true, output: `${fetched.output}\nYa está actualizado.` };
+    // Como git real: el fetch ya se hizo, pero el merge del pull aborta antes
+    // de pisar cambios locales sin commitear (también en fast-forward).
+    const pisados = this._localChangesOverwrittenBy(localHash, remoteHash);
+    if (pisados.length) {
+      return { ok: false, output: `${fetched.output}\n${this._overwrittenByMergeError(pisados).output}` };
+    }
     if (this._isAncestor(localHash, remoteHash)) {
       this.branches.set(branch, remoteHash);
       this._addReflog(branch, remoteHash, `pull: Fast-forward to ${remoteHash}`);

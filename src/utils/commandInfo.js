@@ -80,8 +80,8 @@ export const COMMAND_INFO = {
     desc: 'La red de seguridad: registra todos los movimientos de HEAD (commits, resets, checkouts). Permite recuperar commits "perdidos".',
   },
   push: {
-    usage: 'git push [origin] [<rama>]',
-    desc: 'Sube tus commits locales al remoto (origin) para compartirlos con el equipo.',
+    usage: 'git push [-u] [origin] [<rama>]',
+    desc: 'Sube tus commits locales al remoto (origin) para compartirlos con el equipo. Con -u, la rama queda configurada para seguir a su homóloga en origin.',
   },
   pull: {
     usage: 'git pull',
