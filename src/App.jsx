@@ -188,6 +188,14 @@ export default function App() {
         return;
       }
     }
+
+    // Lecciones con setup "vivo" (liveSetup): el escenario se re-evalúa tras
+    // cada comando para reaccionar al estado del repo (p. ej. en gh-l6 la
+    // compañera vuelve a editar si su commit se integró sin conflicto).
+    // Los setups son idempotentes, así que re-ejecutarlos es seguro.
+    if (currentLesson?.liveSetup && typeof currentLesson.setup === 'function') {
+      runSetup(currentLesson.setup);
+    }
   }
 
   function handleReset() {

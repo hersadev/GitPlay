@@ -46,15 +46,20 @@ const RULES = [
   {
     used: /^git\s+tag\s+-a\s+(\S+)/,
     usedNeedle: 'tag -a',
-    askedNeedle: 'git tag',
+    askedNeedle: ['git tag', 'tag v'],
     asked: ([, name]) => `git tag ${name}`,
   },
 ];
 
+const mentions = (text, needles) =>
+  (Array.isArray(needles) ? needles : [needles]).some((n) => text.includes(n));
+
 // Qué forma pide la lección: decide el primer nivel de texto que mencione
-// alguna de las dos, por orden de autoridad (objetivos > descripción > pistas).
-// Si ese nivel menciona la forma usada, la lección la contempla y no se avisa;
-// las curiosidades no cuentan, son anécdota y no enunciado.
+// alguna de las dos, por orden de autoridad (objetivos > título > descripción).
+// Si ese nivel menciona la forma usada, la lección la contempla y no se avisa.
+// Las pistas NO cuentan: son recetas paso a paso y citan comandos auxiliares
+// de pasada (un "git switch main" previo no significa que la lección enseñe
+// switch). Las curiosidades tampoco, son anécdota y no enunciado.
 export function equivalentCommandWarning(command, result, lesson) {
   if (!lesson) return null;
   for (const rule of RULES) {
@@ -64,12 +69,12 @@ export function equivalentCommandWarning(command, result, lesson) {
     if (outputGate && !outputGate.test(result.output ?? '')) continue;
     const tiers = [
       (lesson.objectives ?? []).map((o) => o.label).join('\n'),
+      lesson.title ?? '',
       lesson.description ?? '',
-      (lesson.hints ?? []).join('\n'),
     ];
     for (const tier of tiers) {
-      const mentionsUsed = tier.includes(rule.usedNeedle);
-      const mentionsAsked = tier.includes(rule.askedNeedle);
+      const mentionsUsed = mentions(tier, rule.usedNeedle);
+      const mentionsAsked = mentions(tier, rule.askedNeedle);
       if (!mentionsUsed && !mentionsAsked) continue;
       if (mentionsAsked && !mentionsUsed) {
         return `Aviso: el resultado es el mismo y se da por bueno, pero la lección lo pedía de otra manera: ${rule.asked(m)}`;

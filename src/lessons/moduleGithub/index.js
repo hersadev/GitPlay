@@ -19,6 +19,39 @@ import {
   DARK_TOGGLE_JS,
 } from './fixtures';
 
+// ¿El historial de main contiene un merge cuyo segundo padre es un commit de
+// la compañera? Es la firma inequívoca de "resolví el conflicto del pull".
+const mergeConCompanera = (s) => {
+  let cur = s.branches.get('main');
+  while (cur) {
+    const c = s.commits.get(cur);
+    if (!c) return false;
+    if (c.secondParent && s.commits.get(c.secondParent)?.author === 'compañero') return true;
+    cur = c.parent;
+  }
+  return false;
+};
+
+// Commits propios (autor 'Tú') que tocan README.md: el de gh-l1 más, al menos,
+// tu edición local de esta lección. Persistente: sigue siendo cierto al acabar.
+const editasteElReadme = (s) =>
+  [...s.commits.values()].filter((c) => c.author === 'Tú' && c.files?.includes?.('README.md')).length >= 2;
+
+// ¿`hash` es alcanzable desde `from` en el grafo local? (ambos padres)
+const alcanzable = (commits, hash, from) => {
+  const stack = [from];
+  const seen = new Set();
+  while (stack.length) {
+    const cur = stack.pop();
+    if (!cur || seen.has(cur)) continue;
+    if (cur === hash) return true;
+    seen.add(cur);
+    const c = commits.get(cur);
+    if (c) stack.push(c.parent, c.secondParent);
+  }
+  return false;
+};
+
 export const moduleGithub = [
   {
     id: 'gh-l1',
@@ -118,26 +151,54 @@ export const moduleGithub = [
     description:
       'Tu compañera modificó el `README.md` y mergeó su PR. Mientras tanto, tú también lo editaste en local. Al hacer `git pull` los dos cambios chocan: te toca resolver tu primer conflicto y subir el resultado con `git push`. Tranquilidad — un conflicto no es un error, es Git pidiéndote que decidas tú.',
     objectives: [
-      { label: 'Tienes un commit local que toca README.md', validate: (s) => fileOnBranch('README.md', 'main')(s) },
-      { label: 'Conflicto resuelto y pusheado (main sincronizado con origin)', validate: (s) => mergeResolved(s) && branchSynced('main')(s) },
+      { label: 'Editar README.md en local y commitearlo', validate: editasteElReadme },
+      {
+        label: 'Resolver el conflicto del pull y pushear (main sincronizado)',
+        validate: (s) => mergeConCompanera(s) && mergeResolved(s) && branchSynced('main')(s),
+      },
     ],
     hints: [
-      'Edita el README.md (pulsa sobre el archivo en el panel derecho → Editar) y haz un commit local',
+      'Edita el README.md: pulsa el commit en el grafo → README.md → Editar. Guarda, y verás el archivo en el panel derecho para hacer git add y git commit',
       'git pull   (verás "CONFLICTO" en README.md y se abrirá el resolutor visual)',
       'Elige con los botones qué conservar (los tuyos, los del compañero o ambos) y pulsa "Guardar y marcar resuelto" — hace el git add por ti',
       'También puedes hacerlo a mano: quitar los marcadores <<<<<<< ======= >>>>>>> y git add README.md',
       'git commit   (concluye el merge; el mensaje es opcional)',
       'git push   (sube el merge: main y origin/main vuelven a estar iguales)',
+      '¿Hiciste git pull antes de editar? Sin cambios locales no hay conflicto (fast-forward)… pero la compañera ha vuelto a editar: edita tú el README, commitea y repite git pull',
     ],
     setupFiles: { 'README.md': README_BASE },
+    // El setup se re-ejecuta tras cada comando (liveSetup): si el alumno pullea
+    // antes de editar, el fast-forward se traga la edición de la compañera y el
+    // conflicto sería imposible — así que ella vuelve a editar el README.
+    liveSetup: true,
     setup: (engine) => {
-      // Asegúrate de que el README ya esté en main local y en origin/main como en gh-l1.
-      // Luego "el compañero" mergea una versión distinta en remoto.
-      engine.seedRemoteCommit('main', {
-        message: 'docs: aclarar que es open-source',
-        files: { 'README.md': README_TEAMMATE_EDIT },
-        author: 'compañero',
-      });
+      const localTip = engine.branches.get('main');
+      const remoteTip = engine.remoteBranches.get('main');
+      if (!localTip || !remoteTip) return;
+      // Si el conflicto ya se resolvió (hay merge con commit de la compañera), no tocar nada.
+      for (let cur = localTip; cur; cur = engine.commits.get(cur)?.parent) {
+        const c = engine.commits.get(cur);
+        if (!c) break;
+        if (c.secondParent && engine.commits.get(c.secondParent)?.author === 'compañero') return;
+      }
+      const ediciones = [...engine.remoteCommits.values()].filter((c) => c.author === 'compañero').length;
+      if (ediciones === 0) {
+        // Primera edición de la compañera en origin (idéntico al setup original).
+        engine.seedRemoteCommit('main', {
+          message: 'docs: aclarar que es open-source',
+          files: { 'README.md': README_TEAMMATE_EDIT },
+          author: 'compañero',
+        });
+        return;
+      }
+      // Su edición ya está integrada en local (pull sin conflicto): vuelve a editar.
+      if (alcanzable(engine.commits, remoteTip, localTip)) {
+        engine.seedRemoteCommit('main', {
+          message: `docs: retocar el README (${ediciones})`,
+          files: { 'README.md': `${README_TEAMMATE_EDIT}\n\nRetoque nº ${ediciones} de la compañera.` },
+          author: 'compañero',
+        });
+      }
     },
     curiosity:
       'En Git el conflicto NO es un error de Git, es una situación que ocurre cuando dos personas tocan las mismas líneas. Git no decide por ti: solo te pone los dos lados y espera tu decisión.',
