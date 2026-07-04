@@ -292,6 +292,16 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
       y: (el.clientHeight - height * z) / 2,
     });
   }
+  // Centra la cámara en el commit de HEAD (o el más reciente si no hay HEAD).
+  function centerOnHead() {
+    const el = containerRef.current;
+    const pos = focusHash ? positions.get(focusHash) : null;
+    if (!el || !pos) return;
+    setCam({
+      x: el.clientWidth / 2 - pos.x * zoom,
+      y: el.clientHeight / 2 - pos.y * zoom,
+    });
+  }
 
   if (!commits.size) {
     return (
@@ -357,6 +367,12 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
           <pattern id="dotgrid" width="26" height="26" patternUnits="userSpaceOnUse">
             <circle cx="1.5" cy="1.5" r="1.2" fill="#1f2937" />
           </pattern>
+          {/* Halo dorado del commit actual (HEAD) */}
+          <radialGradient id="headGlow">
+            <stop offset="0%" stopColor="#fabd2f" stopOpacity="0.4" />
+            <stop offset="55%" stopColor="#fabd2f" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#fabd2f" stopOpacity="0" />
+          </radialGradient>
         </defs>
 
         <g transform={`translate(${cam.x} ${cam.y}) scale(${zoom})`}>
@@ -415,8 +431,9 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
               >
                 {/* Tooltip nativo con el mensaje completo */}
                 <title>{`${commit.hash} — ${commit.message}\n${commit.author}`}</title>
-                {/* Ping en el commit más reciente: onda tipo radar */}
-                {isNewest && !selectedHash && (
+                {/* Ping en el commit más reciente: onda tipo radar.
+                    Si además es HEAD no se dibuja: ahí ya manda el halo dorado */}
+                {isNewest && !isHead && !selectedHash && (
                   <motion.circle
                     cx={pos.x} cy={pos.y}
                     fill="none" stroke={color} strokeWidth={2.5}
@@ -429,9 +446,24 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                 {isSelected && (
                   <circle cx={pos.x} cy={pos.y} r={NODE_R + 7} fill="none" stroke="white" strokeWidth={1.5} strokeOpacity={0.4} />
                 )}
-                {/* HEAD ring */}
+                {/* "Estás aquí": halo dorado que respira + anillo punteado en
+                    movimiento alrededor del commit de HEAD */}
                 {isHead && (
-                  <circle cx={pos.x} cy={pos.y} r={NODE_R + 4} fill="none" stroke="#fabd2f" strokeWidth={2} strokeDasharray="4 2" />
+                  <>
+                    <motion.circle
+                      cx={pos.x} cy={pos.y}
+                      fill="url(#headGlow)"
+                      initial={{ r: NODE_R + 14, opacity: 0.7 }}
+                      animate={{ r: [NODE_R + 14, NODE_R + 22, NODE_R + 14], opacity: [0.7, 1, 0.7] }}
+                      transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                    <motion.circle
+                      cx={pos.x} cy={pos.y} r={NODE_R + 5}
+                      fill="none" stroke="#fabd2f" strokeWidth={2.5} strokeDasharray="7 5"
+                      animate={{ strokeDashoffset: [0, -24] }}
+                      transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
+                    />
+                  </>
                 )}
                 {/* Node circle */}
                 <circle
@@ -472,7 +504,10 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
               const pos = positions.get(hash);
               if (!pos) continue;
               refs.forEach((ref) => {
-                const text = ref.kind === 'tag' ? `◆ ${ref.name}` : ref.name;
+                // La rama activa se etiqueta como en git log: "HEAD → rama"
+                const text = ref.kind === 'tag' ? `◆ ${ref.name}`
+                  : ref.kind === 'local' && ref.name === HEAD ? `HEAD → ${ref.name}`
+                  : ref.name;
                 items.push({ ...ref, hash, pos, text, textWidth: text.length * 7 + 16 });
               });
             }
@@ -502,6 +537,14 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
                       x1={pos.x} y1={labelY + 9}
                       x2={pos.x} y2={pos.y - NODE_R - 2}
                       stroke={color} strokeWidth={1} strokeDasharray="2 3" opacity={0.55}
+                    />
+                  )}
+                  {/* Pin de la etiqueta activa: triángulo que apunta al commit,
+                      estilo "estás aquí" de un mapa */}
+                  {isActive && isStackBase && (
+                    <path
+                      d={`M ${pos.x - 5} ${labelY + 8} L ${pos.x + 5} ${labelY + 8} L ${pos.x} ${labelY + 16} Z`}
+                      fill={color}
                     />
                   )}
                   <rect
@@ -573,6 +616,15 @@ export default function GraphView({ commits, branches, tags = new Map(), remoteR
           aria-label="Acercar"
         >
           +
+        </button>
+        <div className="w-px h-4 bg-gray-700 mx-0.5" />
+        <button
+          onClick={centerOnHead}
+          className="w-7 h-7 flex items-center justify-center text-yellow-400 hover:text-yellow-200 hover:bg-gray-700 rounded text-lg leading-none"
+          aria-label="Ir a donde estás (HEAD)"
+          title="Ir a donde estás (HEAD)"
+        >
+          ⌖
         </button>
       </div>
 
