@@ -21,6 +21,7 @@ import { useLessonProgress } from './hooks/useLessonProgress';
 import { useBadges } from './hooks/useBadges';
 import { BADGES } from './utils/badges';
 import { extractModuleCommands } from './utils/commandInfo';
+import { equivalentCommandWarning } from './utils/commandEquivalents';
 import { splitChainedCommands } from './engine/CommandParser';
 import {
   saveLessonIndex,
@@ -171,6 +172,10 @@ export default function App() {
       }
       const result = runCommand(part);
       if (result.output) pushOutput(result.output, result.ok ? 'success' : 'error');
+      if (result.ok) {
+        const warning = equivalentCommandWarning(part, result, currentLesson);
+        if (warning) pushOutput(warning, 'info');
+      }
       // Como en la shell, && corta la cadena en el primer error.
       if (!result.ok) {
         // Si el comando dejó conflictos pendientes, abrir el resolutor visual
