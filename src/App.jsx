@@ -14,6 +14,7 @@ import GitHubView from './components/github/GitHubView';
 import CommandLog from './components/commands/CommandLog';
 import WelcomeModal from './components/onboarding/WelcomeModal';
 import ModuleIntroModal from './components/lesson/ModuleIntroModal';
+import StuckHelpModal from './components/lesson/StuckHelpModal';
 import { useGitStore } from './store/gitStore';
 import { useGitEngine } from './hooks/useGitEngine';
 import { useTerminalHistory } from './hooks/useTerminalHistory';
@@ -53,6 +54,10 @@ function listFiles(repo) {
 // Git real) quedan fuera del contador y de la barra de progreso del header.
 const CORE_LESSONS = ALL_LESSONS.filter((l) => !l.optional).length;
 
+// Errores de terminal SEGUIDOS en la misma lección antes de abrir el modal de
+// ayuda (cualquier comando que funcione reinicia la racha).
+const STUCK_ERROR_THRESHOLD = 4;
+
 export default function App() {
   const { repoState, runCommand, resetRepo, seedFiles, editFile, runSetup } = useGitEngine();
   const { lines, pushCommand, pushOutput, clear: clearTerminal } = useTerminalHistory();
@@ -70,6 +75,8 @@ export default function App() {
   const [welcomeOpen, setWelcomeOpen] = useState(() => !loadWelcomeSeen());
   // Aviso de comandos: se muestra UNA vez al empezar cada módulo.
   const [moduleIntroOpen, setModuleIntroOpen] = useState(false);
+  // Modal de ayuda tras varios errores seguidos en la lección actual.
+  const [stuckOpen, setStuckOpen] = useState(false);
   const [seenModuleIntros, setSeenModuleIntros] = useState(() => new Set(loadSeenModuleIntros()));
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(240);
@@ -79,6 +86,8 @@ export default function App() {
 
   // Track the previous isComplete value to detect false → true transitions only
   const prevIsComplete = useRef(false);
+  // Racha de errores consecutivos del terminal (se rearma al acertar).
+  const errorStreak = useRef(0);
 
   const currentLesson = sandboxMode ? null : (ALL_LESSONS[lessonIndex] ?? null);
   const { completedCount, isComplete, checkObjective } = useLessonProgress(currentLesson);
@@ -126,6 +135,11 @@ export default function App() {
     if (typeof currentLesson.setup === 'function') runSetup(currentLesson.setup);
   }, [currentLesson, seedFiles, runSetup]);
 
+  // Al cambiar de lección (o entrar al sandbox) se olvida la racha de errores.
+  useEffect(() => {
+    errorStreak.current = 0;
+  }, [currentLesson?.id]);
+
   // Advance only when isComplete transitions false → true (not on initial load).
   // Al completar la última lección avanza a ALL_LESSONS.length: el panel muestra
   // la pantalla de graduación y la barra de progreso llega al 100%.
@@ -144,6 +158,17 @@ export default function App() {
 
     return () => clearTimeout(timer);
   }, [isComplete, lessonIndex]);
+
+  // Un error más en la racha: al llegar al umbral, abrir el modal de ayuda de
+  // la lección y rearmar el contador (si sigue fallando, volverá a salir).
+  function registerCommandError() {
+    if (!currentLesson || currentLesson.optional || !currentLesson.hints?.length) return;
+    errorStreak.current += 1;
+    if (errorStreak.current >= STUCK_ERROR_THRESHOLD) {
+      errorStreak.current = 0;
+      setStuckOpen(true);
+    }
+  }
 
   // Ejecuta una línea del terminal: soporta ls/touch/clear y comandos
   // encadenados con && (como aparecen en muchas pistas).
@@ -165,6 +190,7 @@ export default function App() {
         const names = part.slice(5).trim().split(/\s+/).filter(Boolean);
         if (!names.length) {
           pushOutput('Uso: touch <archivo>', 'error');
+          registerCommandError();
           return;
         }
         names.forEach((n) => createFile(n));
@@ -179,15 +205,23 @@ export default function App() {
       // Como en la shell, && corta la cadena en el primer error.
       if (!result.ok) {
         // Si el comando dejó conflictos pendientes, abrir el resolutor visual
-        // sobre el primer archivo en conflicto.
+        // sobre el primer archivo en conflicto. Un conflicto no es una
+        // equivocación (es parte de la lección): no cuenta para la racha.
         if (/^git (merge|pull|rebase)\b/.test(part)) {
           const repo = useGitStore.getState().repoState;
           const conflicts = repo.mergeState?.conflicts ?? repo.rebaseState?.conflicts;
-          if (conflicts?.size) setOpenFile({ name: [...conflicts][0], source: 'working' });
+          if (conflicts?.size) {
+            setOpenFile({ name: [...conflicts][0], source: 'working' });
+            return;
+          }
         }
+        registerCommandError();
         return;
       }
     }
+
+    // La línea entera funcionó: la racha de errores se corta.
+    errorStreak.current = 0;
 
     // Lecciones con setup "vivo" (liveSetup): el escenario se re-evalúa tras
     // cada comando para reaccionar al estado del repo (p. ej. en gh-l6 la
@@ -206,6 +240,8 @@ export default function App() {
     setLessonIndex(0);
     setMaxReached(0);
     prevIsComplete.current = false;
+    errorStreak.current = 0;
+    setStuckOpen(false);
     setSandboxMode(false);
     setSelectorOpen(false);
     setBadgesOpen(false);
@@ -393,6 +429,16 @@ export default function App() {
             onMergePR={mergePR}
             onClosePR={closePR}
             onOpenFile={(f) => setOpenFile(f)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {stuckOpen && currentLesson && (
+          <StuckHelpModal
+            lesson={currentLesson}
+            progress={completedCount}
+            onClose={() => setStuckOpen(false)}
           />
         )}
       </AnimatePresence>
