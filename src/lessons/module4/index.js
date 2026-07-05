@@ -102,8 +102,16 @@ export const module4 = [
         validate: fileOnBranch('Dashboard.jsx', 'feature/dashboard'),
       },
       {
-        label: 'Hacer un rebase desde feature/dashboard',
-        validate: (s) => onBranch('feature/dashboard')(s) && lastCmd('rebase')(s),
+        label: 'Avanzar main (metrics.js) y rebasear feature/dashboard encima',
+        // Por ESTADO del grafo, no por lastCmd: un rebase que aborta (p. ej.
+        // por cambios sin commitear) no debe dar la lección por buena. Tras el
+        // rebase real, el tip de main queda en la línea de primeros padres de
+        // feature/dashboard y la rama va estrictamente por delante.
+        validate: (s) =>
+          onBranch('feature/dashboard')(s) &&
+          fileOnBranch('metrics.js', 'main')(s) &&
+          s.branches.get('feature/dashboard') !== s.branches.get('main') &&
+          rebasedOnto('feature/dashboard', 'main')(s),
       },
     ],
     hints: [

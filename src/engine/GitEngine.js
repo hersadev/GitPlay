@@ -608,6 +608,9 @@ export class GitEngine {
     }
     const target = args[0];
     if (!this.branches.has(target)) {
+      if (this.tags.has(target)) {
+        return { ok: false, output: `fatal: se esperaba una rama, se obtuvo el tag '${target}'.\nPara inspeccionarlo con HEAD desacoplado: git switch --detach ${target}` };
+      }
       if (this._findCommit(target)) {
         return { ok: false, output: `fatal: se esperaba una rama, se obtuvo el commit '${target}'.\nPara inspeccionarlo con HEAD desacoplado: git switch --detach ${target}` };
       }
@@ -875,10 +878,11 @@ export class GitEngine {
     if (this.rebaseState) {
       return { ok: false, output: 'Hay un rebase en curso.\nTermínalo con `git rebase --continue` o cancélalo con `git rebase --abort`.' };
     }
-    if (!args.length) return { ok: false, output: 'Uso: git revert <hash>' };
+    if (!args.length) return { ok: false, output: 'Uso: git revert <hash>\n       git revert HEAD' };
     this._setLast('revert', args);
 
-    const target = this._findCommit(args[0]);
+    // Como en git real: acepta HEAD, HEAD~n, ramas, tags y hashes.
+    const target = this._resolveRef(args[0]);
     if (!target) return { ok: false, output: `error: no existe el commit '${args[0]}'.` };
 
     const original = this.commits.get(target);
@@ -1537,6 +1541,13 @@ export class GitEngine {
       this._addReflog('HEAD', this.branches.get(target), `checkout: moverse de ${prev} a ${target}`);
       return { ok: true, output: `Cambiado a rama '${target}'` };
     }
+    // Un tag lleva a su commit con HEAD desacoplado, como en git real.
+    if (this.tags.has(target)) {
+      const tagHash = this.tags.get(target);
+      this.HEAD = tagHash;
+      this._addReflog('HEAD', tagHash, `checkout: moverse a ${target} (HEAD desacoplado)`);
+      return { ok: true, output: `HEAD desacoplado en ${tagHash} (tag '${target}')` };
+    }
     // Acepta hash completo o abreviado (prefijo).
     const hash = this._findCommit(target);
     if (hash) {
@@ -1601,6 +1612,7 @@ export class GitEngine {
       return hash;
     }
     if (this.branches.has(ref)) return this.branches.get(ref);
+    if (this.tags.has(ref)) return this.tags.get(ref);
     // Hash completo o abreviado.
     return this._findCommit(ref);
   }

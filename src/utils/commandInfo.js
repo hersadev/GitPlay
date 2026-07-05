@@ -56,7 +56,7 @@ export const COMMAND_INFO = {
     desc: 'Mueve la rama a otro commit: --soft conserva el staging, --mixed lo vacía, --hard borra también el working directory. Con un archivo, lo saca del staging.',
   },
   revert: {
-    usage: 'git revert <hash>',
+    usage: 'git revert <hash> · git revert HEAD',
     desc: 'Deshace un commit creando otro nuevo que aplica los cambios inversos. La forma segura de deshacer en ramas compartidas.',
   },
   stash: {
