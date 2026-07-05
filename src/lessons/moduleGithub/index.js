@@ -32,10 +32,27 @@ const mergeConCompanera = (s) => {
   return false;
 };
 
-// Commits propios (autor 'Tú') que tocan README.md: el de gh-l1 más, al menos,
-// tu edición local de esta lección. Persistente: sigue siendo cierto al acabar.
-const editasteElReadme = (s) =>
-  [...s.commits.values()].filter((c) => c.author === 'Tú' && c.files?.includes?.('README.md')).length >= 2;
+// Tu edición local del README para ESTA lección: un commit tuyo (no merge) que
+// toca README.md y que es CONCURRENTE con alguna edición de la compañera — es
+// decir, que ella no tenía cuando editó. Contar commits históricos no vale:
+// los README de módulos anteriores dejaban el objetivo pre-marcado al entrar.
+// Persistente al acabar: tras resolver y pushear, ella no vuelve a editar, así
+// que tu commit nunca pasa a ser ancestro de los suyos.
+const editasteElReadme = (s) => {
+  const all = new Map([...s.remoteCommits, ...s.commits]);
+  const deLaCompanera = [...all.entries()]
+    .filter(([, c]) => c.author === 'compañero')
+    .map(([hash]) => hash);
+  if (!deLaCompanera.length) return false; // el escenario aún no arrancó
+  for (const [hash, c] of s.commits) {
+    if (c.author !== 'Tú' || !c.files?.includes?.('README.md') || c.secondParent) continue;
+    // Si algún commit de la compañera lo tiene como ancestro, es una edición
+    // vieja (ya integrada antes de que ella editara), no la de esta lección.
+    if (deLaCompanera.some((suyo) => alcanzable(all, hash, suyo))) continue;
+    return true;
+  }
+  return false;
+};
 
 // ¿`hash` es alcanzable desde `from` en el grafo local? (ambos padres)
 const alcanzable = (commits, hash, from) => {
