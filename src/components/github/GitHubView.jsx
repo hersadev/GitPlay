@@ -678,6 +678,12 @@ export default function GitHubView({ repo, onClose, onOpenPR, onMergePR, onClose
             </div>
           )}
         </div>
+
+        <footer className="px-4 py-1.5 bg-[#161b22] border-t border-[#30363d] text-center flex-shrink-0">
+          <p className="text-[11px] text-[#8b949e]">
+            Simulador educativo con fines didácticos. No está afiliado a GitHub, Inc. ni cuenta con su respaldo.
+          </p>
+        </footer>
       </motion.div>
     </motion.div>
   );
