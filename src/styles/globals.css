@@ -2,6 +2,158 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   Temas. Cada variable es un triplete "R G B" (sin rgb()) para
+   que Tailwind pueda aplicar opacidad: rgb(var(--c-x) / alpha).
+   tailwind.config.js mapea las escalas de color a estas variables.
+   ============================================================ */
+
+/* Tema clásico: paleta Gruvbox (cálida / retro-terminal). */
+:root {
+  --c-white: 251 241 199;
+
+  /* Superficies y texto (marrón-carbón → crema). */
+  --c-gray-100: 235 219 178;
+  --c-gray-200: 213 196 161;
+  --c-gray-300: 189 174 147;
+  --c-gray-400: 168 153 132;
+  --c-gray-500: 146 131 116;
+  --c-gray-600: 124 111 100;
+  --c-gray-700: 80 73 69;
+  --c-gray-750: 69 63 59;
+  --c-gray-800: 60 56 54;
+  --c-gray-850: 50 48 47;
+  --c-gray-900: 40 40 40;
+  --c-gray-950: 29 32 33;
+
+  /* Acento principal: verde oliva gruvbox. */
+  --c-green-100: 238 241 192;
+  --c-green-200: 221 224 143;
+  --c-green-300: 202 203 87;
+  --c-green-400: 184 187 38;
+  --c-green-500: 166 167 31;
+  --c-green-600: 152 151 26;
+  --c-green-700: 114 112 16;
+  --c-green-800: 90 88 12;
+  --c-green-900: 69 68 8;
+
+  --c-yellow-200: 251 229 160;
+  --c-yellow-300: 252 213 97;
+  --c-yellow-400: 250 189 47;
+  --c-yellow-700: 181 118 20;
+  --c-yellow-900: 122 82 16;
+
+  --c-red-100: 251 215 208;
+  --c-red-200: 246 176 164;
+  --c-red-400: 251 73 52;
+  --c-red-600: 204 36 29;
+  --c-red-700: 157 0 6;
+  --c-red-800: 121 4 11;
+
+  --c-purple-100: 243 221 230;
+  --c-purple-200: 232 188 203;
+  --c-purple-300: 222 161 179;
+  --c-purple-400: 211 134 155;
+  --c-purple-600: 177 98 134;
+  --c-purple-700: 143 79 109;
+  --c-purple-900: 87 50 74;
+
+  --c-blue-300: 166 192 180;
+  --c-blue-400: 131 165 152;
+  --c-blue-700: 53 110 111;
+  --c-blue-900: 33 58 60;
+
+  --c-orange-100: 253 225 198;
+  --c-orange-300: 253 184 119;
+  --c-orange-500: 254 128 25;
+  --c-orange-700: 214 93 14;
+  --c-orange-900: 138 61 11;
+
+  /* sky se usa en el resolutor de conflictos; en clásico conserva
+     los valores por defecto de Tailwind. */
+  --c-sky-50: 240 249 255;
+  --c-sky-300: 125 211 252;
+  --c-sky-800: 7 89 133;
+  --c-sky-900: 12 74 110;
+
+  /* Aqua gruvbox para los pocos usos de emerald/cyan. */
+  --c-emerald-400: 142 192 124;
+  --c-cyan-400: 142 192 124;
+}
+
+/* Tema retro: CRT de fósforo verde sobre negro, acentos tipo ANSI. */
+[data-theme='retro'] {
+  --c-white: 232 255 232;
+
+  /* Verdes apagados para superficies/texto secundario (negro → verde pálido). */
+  --c-gray-100: 194 240 194;
+  --c-gray-200: 163 222 163;
+  --c-gray-300: 133 199 133;
+  --c-gray-400: 103 171 103;
+  --c-gray-500: 78 138 78;
+  --c-gray-600: 59 107 59;
+  --c-gray-700: 35 64 35;
+  --c-gray-750: 28 53 28;
+  --c-gray-800: 21 40 21;
+  --c-gray-850: 14 30 14;
+  --c-gray-900: 9 21 9;
+  --c-gray-950: 0 0 0;
+
+  /* Acento: verde fósforo brillante. */
+  --c-green-100: 217 255 217;
+  --c-green-200: 173 255 173;
+  --c-green-300: 125 255 125;
+  --c-green-400: 57 255 57;
+  --c-green-500: 46 230 46;
+  --c-green-600: 35 204 35;
+  --c-green-700: 22 148 22;
+  --c-green-800: 14 107 14;
+  --c-green-900: 8 69 8;
+
+  /* Ámbar de monitor. */
+  --c-yellow-200: 255 233 163;
+  --c-yellow-300: 255 211 92;
+  --c-yellow-400: 255 176 0;
+  --c-yellow-700: 168 110 0;
+  --c-yellow-900: 92 61 0;
+
+  --c-red-100: 255 217 217;
+  --c-red-200: 255 176 176;
+  --c-red-400: 255 75 75;
+  --c-red-600: 212 42 42;
+  --c-red-700: 163 20 20;
+  --c-red-800: 122 13 13;
+
+  /* Magenta ANSI. */
+  --c-purple-100: 250 220 250;
+  --c-purple-200: 240 184 240;
+  --c-purple-300: 230 148 230;
+  --c-purple-400: 221 111 221;
+  --c-purple-600: 177 60 177;
+  --c-purple-700: 138 42 138;
+  --c-purple-900: 82 26 82;
+
+  /* Cian ANSI. */
+  --c-blue-300: 125 232 232;
+  --c-blue-400: 60 214 214;
+  --c-blue-700: 26 127 127;
+  --c-blue-900: 13 66 66;
+
+  --c-orange-100: 255 228 194;
+  --c-orange-300: 255 184 102;
+  --c-orange-500: 255 140 26;
+  --c-orange-700: 204 102 10;
+  --c-orange-900: 102 51 5;
+
+  --c-sky-50: 217 255 255;
+  --c-sky-300: 125 232 232;
+  --c-sky-800: 15 89 89;
+  --c-sky-900: 10 61 61;
+
+  --c-emerald-400: 46 230 134;
+  --c-cyan-400: 60 214 214;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -14,4 +166,46 @@
     @apply bg-gray-950 text-white;
     font-family: 'Inter', system-ui, sans-serif;
   }
+}
+
+/* ============================================================
+   Efectos del tema retro (solo con [data-theme='retro']).
+   ============================================================ */
+
+/* Tipografía monoespaciada en toda la app y brillo fosforescente
+   (text-shadow sin color usa el color del propio texto). */
+[data-theme='retro'] body {
+  font-family: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+  text-shadow: 0 0 4px;
+}
+
+/* Un CRT no tiene esquinas redondeadas. */
+[data-theme='retro'] *,
+[data-theme='retro'] *::before,
+[data-theme='retro'] *::after {
+  border-radius: 0 !important;
+}
+
+/* Scanlines + viñeta por encima de todo (es "el monitor", no la UI). */
+[data-theme='retro'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 0.2) 0,
+      rgb(0 0 0 / 0.2) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(ellipse at center, transparent 55%, rgb(0 20 0 / 0.3) 100%);
+}
+
+[data-theme='retro'] ::selection {
+  background: rgb(57 255 57);
+  color: rgb(0 0 0);
 }
