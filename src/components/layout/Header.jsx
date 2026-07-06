@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { exportProgress, importProgress } from '../../utils/persistence';
 import { COMMAND_NAMES } from '../../utils/commandInfo';
+import { useThemeStore } from '../../store/themeStore';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
 export default function Header({
@@ -22,6 +23,8 @@ export default function Header({
   const fileInputRef = useRef(null);
   const [justSaved, setJustSaved] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const theme = useThemeStore((s) => s.theme);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
 
   function handleConfirmReset() {
     setConfirmResetOpen(false);
@@ -128,9 +131,18 @@ export default function Header({
         </button>
         <button
           onClick={onToggleSandbox}
-          className={`transition-colors ${sandboxMode ? 'text-yellow-400 hover:text-yellow-300' : 'hover:text-white'}`}
+          className={`transition-colors flex items-center gap-1.5 ${sandboxMode ? 'text-yellow-400 hover:text-yellow-300' : 'hover:text-white'}`}
         >
-          {sandboxMode ? 'Volver a lecciones' : 'Sandbox'}
+          <span>{sandboxMode ? '↩️' : '🎮'}</span>
+          <span>{sandboxMode ? 'Volver a lecciones' : 'Sandbox'}</span>
+        </button>
+        <button
+          onClick={toggleTheme}
+          className={`transition-colors flex items-center gap-1.5 ${theme === 'retro' ? 'text-green-400 hover:text-green-300' : 'hover:text-white'}`}
+          title={theme === 'retro' ? 'Volver al tema clásico' : 'Modo retro: monitor CRT de fósforo verde'}
+        >
+          <span>🖥️</span>
+          <span className="text-xs">Retro</span>
         </button>
         <button
           onClick={handleExport}

@@ -191,6 +191,18 @@ export function saveSeenModuleIntros(ids) {
   try { localStorage.setItem(MODULE_INTROS_KEY, JSON.stringify(ids)); } catch (_) {}
 }
 
+// Tema visual elegido ('classic' | 'retro'). Es una preferencia, no progreso:
+// no se borra al reiniciar la partida ni viaja en el export.
+const THEME_KEY = 'gitplay:theme';
+
+export function loadTheme() {
+  try { return localStorage.getItem(THEME_KEY) === 'retro' ? 'retro' : 'classic'; } catch (_) { return 'classic'; }
+}
+
+export function saveTheme(theme) {
+  try { localStorage.setItem(THEME_KEY, theme); } catch (_) {}
+}
+
 const BADGES_KEY = 'gitplay:badges';
 const EXPORT_VERSION = 1;
 
