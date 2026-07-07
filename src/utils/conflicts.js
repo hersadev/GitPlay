@@ -1,5 +1,29 @@
 // Utilidades para trabajar con marcadores de conflicto (<<<<<<< / ======= / >>>>>>>).
-// Las usa el motor (para validar) y el resolutor visual de conflictos.
+// Las usa el motor (para generar y validar) y el resolutor visual de conflictos.
+
+// Genera los marcadores SOLO alrededor de la zona que difiere (prefijo y sufijo
+// comunes fuera del conflicto), como hace git real hunk a hunk. Así el conflicto
+// es legible y "conservar ambos" tiene sentido.
+export function buildConflictMarkers(ours, theirs, ourLabel = 'HEAD', theirLabel = 'theirs') {
+  const a = ours === '' ? [] : ours.split('\n');
+  const b = theirs === '' ? [] : theirs.split('\n');
+
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
+
+  return [
+    ...a.slice(0, start),
+    `<<<<<<< ${ourLabel}`,
+    ...a.slice(start, endA),
+    '=======',
+    ...b.slice(start, endB),
+    `>>>>>>> ${theirLabel}`,
+    ...a.slice(endA),
+  ].join('\n');
+}
 
 export function hasConflictMarkers(content) {
   return typeof content === 'string' && /^<<<<<<< /m.test(content) && /^>>>>>>> /m.test(content);
